@@ -1,11 +1,21 @@
-# blessing-dapp
+# blessing-dapp-near
 
 Blessing is the most universal human expression of emotion, and we are NFTizing it.
 
-## Basic Sample Hardhat Project
+## How it works
 
 ```bash
-npx hardhat run scripts/add_blessings_bsc_mainnet.js --network bsc_mainnet
-npx hardhat flatten ./contracts/CryptoBlessingToken.sol >  ./contracts/FlatCryptoBlessingToken.sol
-npx hardhat verify --network bsc_mainnet 0xAB0444680DC75fBcF90aF8CC74D712d2AF4b4a3c --contract contracts/CryptoBlessingToken.sol
+rustup target add wasm32-unknown-unknown
+
+
+./build.sh
+
+cargo test -- --nocapture
+
+near delete crossword.quyang.testnet quyang.testnet
+near create-account crossword.quyang.testnet --masterAccount quyang.testnet
+
+near deploy crossword.quyang.testnet --wasmFile res/my_crossword.wasm \    
+  --initFunction 'new' \
+  --initArgs '{"solution": "69c2feb084439956193f4c21936025f14a5a5a78979d67ae34762e18a7206a0f"}'
 ```
