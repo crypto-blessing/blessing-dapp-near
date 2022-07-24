@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Box from '@mui/material/Box'
 import { styled, useTheme } from '@mui/material/styles'
 import Typography from '@mui/material/Typography'
+import Badge from '@mui/material/Badge'
 
 // ** Configs
 import themeConfig from 'src/configs/themeConfig'
@@ -49,8 +50,10 @@ const VerticalNavHeader = props => {
         <Link href='/' passHref>
           <StyledLink>
             <img src='/images/logos/logo.png' alt='CBT' width={30} height={30} />
-            <HeaderTitle variant='h6' sx={{ ml: 3 }}>
-              {themeConfig.templateName}
+            <HeaderTitle variant='h7' sx={{ ml: 1 }}>
+              <Badge badgeContent='near' color="secondary">
+                {themeConfig.templateName}
+              </Badge>
             </HeaderTitle>
           </StyledLink>
         </Link>

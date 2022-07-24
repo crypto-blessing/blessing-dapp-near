@@ -11,16 +11,12 @@ import Link from '@mui/material/Link'
 import Twitter from 'mdi-material-ui/Twitter'
 import Telegram from '@mui/icons-material/Telegram';
 
-
-import {injected} from 'src/@core/components/wallet/connector'
-import {simpleShow, chainName} from 'src/@core/components/wallet/address'
-import { useWeb3React } from "@web3-react/core"
+import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
 
 import { useEffect, useState } from "react"
 
 // ** Icons Imports
 import Menu from 'mdi-material-ui/Menu'
-import Magnify from 'mdi-material-ui/Magnify'
 
 import LogoutIcon from '@mui/icons-material/Logout';
 
@@ -34,37 +30,31 @@ import DialogTitle from '@mui/material/DialogTitle';
 
 
 
+
 const AppBarContent = props => {
-
-  const { active, account, library, connector, activate, deactivate, chainId } = useWeb3React()
-
   const [alertTitle, setAlertTitle] = useState('')
   const [alertMessage, setAlertMessage] = useState('')
+  const [currentUser, setCurrentUser] = useState('')
+  const [nearConfig, setNearConfig] = useState({})
 
   async function connect() {
-    try {
-      injected.isAuthorized().then((isAuthorized) => {
-        if (isAuthorized) {
-          activate(injected, undefined, true).catch((e) => {
-            setOpen(true);
-          });
-        } else {
-          console.log("not authorized")
-        }
-      });
+    const walletConnection = await getWalletConnection()
+    walletConnection.requestSignIn(
+      nearConfig.contractName,
+      '', // title. Optional, by the way
+      '', // successUrl. Optional, by the way
+      '', // failureUrl. Optional, by the way
+    ).then(async (response) => {
       localStorage.setItem('isWalletConnected', true)
-    } catch (ex) {
-      console.log(ex)
-    }
+    }).catch(async (error) => {
+      console.log("not authorized")
+    });
   }
 
   async function disconnect() {
-    try {
-      await deactivate()
-      localStorage.setItem('isWalletConnected', false)
-    } catch (ex) {
-      console.log(ex)
-    }
+    const walletConnection = await getWalletConnection()
+    walletConnection.signOut();
+    window.location.replace(window.location.origin + window.location.pathname);
   }
 
   // ** Props
@@ -73,48 +63,21 @@ const AppBarContent = props => {
   // ** Hook
   const hiddenSm = useMediaQuery(theme => theme.breakpoints.down('sm'))
   
+  
 
   useEffect(() => {
     const connectWalletOnPageLoad = async () => {
-      if (localStorage?.getItem('isWalletConnected') === 'true') {
-        try {
-          await activate(injected)
-          localStorage.setItem('isWalletConnected', true)
-        } catch (ex) {
-          console.log(ex)
-        }
-      } else {
-        console.log("not connected")
-      }
+      setNearConfig(await getNearConfig())
+      setCurrentUser(await getCurrentUser())
     }
     connectWalletOnPageLoad()
-  }, [activate, account, props])
+  }, [])
 
   const [open, setOpen] = useState(false);
 
   const handleClose = () => {
     setOpen(false);
   }
-
-  useEffect(() => {
-    switch (chainId) {
-      case 56:
-        setAlertTitle('System maintenance in progress')
-        setAlertMessage('CryptoBlessing is being upgraded and maintained, please be patient for a more secure contract and a better experience.')
-        break;
-      case 97:
-        setAlertTitle('BSC Testnet')
-        setAlertMessage('You are now on BSC Testnet.')
-        break;
-      case 1337:
-        setAlertTitle('Localnet')
-        setAlertMessage('You are now on Localnet.')
-        break;
-      default:
-        setAlertTitle('Don\'t support this network')
-        setAlertMessage('Please switch your network to BSC Mainnet(chainID: 56).')
-    }
-  }, [chainId])
 
   return (
 
@@ -143,17 +106,19 @@ const AppBarContent = props => {
       </Box>
       <Box className='actions-right' sx={{ display: 'flex', alignItems: 'center' }}>
 
-        {active ? 
+        {currentUser ? 
         <ButtonGroup variant="contained" aria-label="outlined primary button group">
-          <Button variant="outlined">{chainName(chainId)}</Button>
-          <Button>{simpleShow(account)}</Button>
+          <Button variant="outlined">{'near-' + nearConfig.networkId}</Button>
+          <Button sx={{
+            textTransform: 'none'
+          }}>{currentUser}</Button>
           <IconButton onClick={disconnect} color="primary" aria-label="add to shopping cart">
             <LogoutIcon />
           </IconButton>
         </ButtonGroup>  
         : 
         <Button onClick={connect} size='large' variant='outlined'>
-          Connect Wallet
+          Near Log in
         </Button>
         }
         <Box sx={{ ml: 2 }} />
@@ -172,9 +137,7 @@ const AppBarContent = props => {
       {/** System maintenance in progress */}
 
       <Dialog
-        open={
-          chainId != 56 && // ** BSC Mainnet maintenance
-          chainId != 97 && chainId != 1337 && chainId != undefined}
+        open={open}
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >

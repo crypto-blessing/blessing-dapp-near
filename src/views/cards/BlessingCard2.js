@@ -41,9 +41,10 @@ import {encode} from 'src/@core/utils/cypher'
 
 
 import { ethers } from 'ethers';
-import { useWeb3React } from "@web3-react/core"
 import CryptoBlessing from 'src/artifacts/contracts/CryptoBlessing.sol/CryptoBlessing.json'
 import BUSDContract from 'src/artifacts/contracts/TestBUSD.sol/BUSD.json'
+
+import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
 
 const style = {
   position: 'absolute',
@@ -71,7 +72,14 @@ const StyledGrid = styled(Grid)(({ theme }) => ({
 
 const BlessingCard2 = (props) => {
 
-  const { active, chainId, account } = useWeb3React()
+  useEffect(() => {
+    const connectWalletOnPageLoad = async () => {
+      setCurrentUser(await getCurrentUser())
+    }
+    connectWalletOnPageLoad()
+  }, [])
+
+  const [currentUser, setCurrentUser] = useState(null)
 
   const [open, setOpen] = useState(false);
   const [tokenAmount, setTokenAmount] = useState(0);
@@ -317,38 +325,10 @@ const BlessingCard2 = (props) => {
     }    
   }
 
-  useEffect(() => {
-    fetchBUSDAmount()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chainId, account])
-
-
   // useEffect(() => {
-  //   if (chainId) {
-  //     const provider = new ethers.providers.JsonRpcProvider(getProviderUrl(chainId))
-  //     const busdContract = new ethers.Contract(BUSDContractAddress(chainId), BUSDContract.abi, provider)
-  //     busdContract.on('Approval', (owner, spender, value) => {
-  //       if (owner === account && spender === cryptoBlessingAdreess(chainId)) {
-  //         console.log('Approved')
-  //         const totalBUSDArppoveAmount = claimQuantity * ethers.utils.formatEther(props.blessing.price) + parseFloat(tokenAmount)
-  //         setNeedApproveBUSDAmount(BigInt((totalBUSDArppoveAmount - ethers.utils.formatEther(value)) * 10 ** 18))
-  //         setLoading(false)
-  //       }
-  //     })
-
-  //     const cbContract = new ethers.Contract(cryptoBlessingAdreess(chainId), CryptoBlessing.abi, provider)
-  //     cbContract.on('senderSendCompleted', (sender, ret_blessingID) => {
-  //       console.log('senderSendCompleted', sender, ret_blessingID)
-  //       if (account == sender) {
-  //         setSending(false)
-  //         setOpen(false)
-  //         setSendSuccessOpen(true)
-  //         setLoading(true)
-  //       }
-  //     })
-
-  //   }
-  // }, [chainId, account, claimQuantity, props.blessing.price, tokenAmount])
+  //   fetchBUSDAmount()
+  // // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [chainId, account])
 
   return (
     <Card>
@@ -366,13 +346,13 @@ const BlessingCard2 = (props) => {
           <Chip size="small" variant="outlined" color="warning" label={props.blessing.price} />
         </Box>
       </CardContent>
-      {active ?
+      {currentUser ?
         <Button size="small" onClick={handleOpen} variant='contained' sx={{ py: 2.5, width: '100%', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
           Send Blessing
         </Button>
       :
         <Button size="small" disabled variant='contained' sx={{ py: 2.5, width: '100%', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
-          Connect Wallet
+          Near log in
         </Button>
       }
 

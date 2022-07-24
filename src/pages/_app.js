@@ -27,11 +27,6 @@ import 'react-perfect-scrollbar/dist/css/styles.css'
 // ** Global css styles
 import '../../styles/globals.css'
 
-// ** Web3 React Injector
-import { Web3ReactProvider } from '@web3-react/core'
-import Web3 from 'web3'
-
-
 const clientSideEmotionCache = createEmotionCache()
 
 // ** Pace Loader
@@ -45,10 +40,6 @@ if (themeConfig.routingLoader) {
   Router.events.on('routeChangeComplete', () => {
     NProgress.done()
   })
-}
-
-const getLibrary = provider => {
-  return new Web3(provider)
 }
 
 // ** Configure JSS & ClassName
@@ -72,17 +63,15 @@ const App = props => {
           <meta name='keywords' content='crypto, blessing, coins, web3, lucky, bag, red' />
           <meta name='viewport' content='initial-scale=1, width=device-width' />
         </Head>
-        <Web3ReactProvider getLibrary={getLibrary}>
-          <SettingsProvider>
-            <SettingsConsumer>
-              {({ settings }) => {
-                return <ThemeComponent settings={settings}>{getLayout(
-                        <Component {...pageProps} />
-                    )}</ThemeComponent>
-              }}
-            </SettingsConsumer>
-          </SettingsProvider>
-        </Web3ReactProvider>
+        <SettingsProvider>
+          <SettingsConsumer>
+            {({ settings }) => {
+              return <ThemeComponent settings={settings}>{getLayout(
+                      <Component {...pageProps} />
+                  )}</ThemeComponent>
+            }}
+          </SettingsConsumer>
+        </SettingsProvider>
         
     </CacheProvider>
   )
