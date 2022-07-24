@@ -73,5 +73,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-
-constract/res
+# Rust smart contract
+contract/target
+contract/res
+Cargo.lock

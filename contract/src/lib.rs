@@ -1,37 +1,51 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::collections::{LookupMap, UnorderedSet};
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    log,
+    serde::{Deserialize, Serialize},
+    AccountId, PanicOnDefault, Promise,
+};
 use near_sdk::{env, near_bindgen};
 
-#[near_bindgen]
-#[derive(Default, BorshDeserialize, BorshSerialize)]
-pub struct Contract {
-    crossword_solution: String,
+
+#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Blessing {
+    price: u128,
+    owner_id: AccountId,
+    deleted: u8,
+    tax_rate: u16,
 }
 
 #[near_bindgen]
-impl Contract {
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+pub struct CryptoBlessing {
+    owner_id: AccountId,
+    blessing_map: LookupMap<String, Blessing>,
+}
+
+#[near_bindgen]
+impl CryptoBlessing {
+
     #[init]
-    pub fn new(solution: String) -> Self {
+    pub fn new(owner_id: AccountId) -> Self {
         Self {
-            crossword_solution: solution,
+            owner_id,
+            blessing_map: LookupMap::new(b"b"),
         }
     }
 
-    pub fn get_solution(&self) -> String {
-        self.crossword_solution.clone()
-    }
-
-    pub fn guess_solution(&mut self, solution: String) -> bool {
-        let hashed_input = env::sha256(solution.as_bytes());
-        let hashed_input_hex = hex::encode(&hashed_input);
-
-        if hashed_input_hex == self.crossword_solution {
-            env::log_str("You guessed right!");
-            true
-        } else {
-            env::log_str("Try again.");
-            false
+    pub fn new_blessings(&mut self, images: Vec<String>, blessings: Vec<Blessing>) {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.owner_id,
+            "Only the owner may call this method"
+        );
+        for(image, blessing) in images.iter().zip(blessings.iter()) {
+            self.blessing_map.insert(&image.clone(), blessing.clone());
         }
     }
+
 }
 
 /*
@@ -68,27 +82,44 @@ mod tests {
         builder
     }
 
+    fn get_blessings() -> Vec<Blessing> {
+        let alice = AccountId::new_unchecked("alice.testnet".to_string());
+        let bob = AccountId::new_unchecked("bob.testnet".to_string());
+
+        vec![
+            Blessing {
+                price: 100_000_000_000_000_000_000_000,
+                owner_id: alice,
+                deleted: 0,
+                tax_rate: 10,
+            },
+            Blessing {
+                price: 100_000_000_000_000_000_000_000,
+                owner_id: bob,
+                deleted: 0,
+                tax_rate: 20,
+            },
+        ]
+    }
+
     #[test]
-    fn check_guess_solution() {
+    fn new_blessings_check() {
         // Get Alice as an account ID
         let alice = AccountId::new_unchecked("alice.testnet".to_string());
         // Set up the testing context and unit test environment
-        let context = get_context(alice);
+        let context = get_context(alice.clone());
         testing_env!(context.build());
 
         // Set up contract object and call the new method
-        let mut contract = Contract::new(
-            "69c2feb084439956193f4c21936025f14a5a5a78979d67ae34762e18a7206a0f".to_string(),
+        let mut contract = CryptoBlessing::new(alice);
+        // Add puzzle
+        let blessings = get_blessings();
+        contract.new_blessings(
+            vec!["image1.gif".to_string(), "image2.gif".to_string()],
+            blessings,
         );
-        let mut guess_result = contract.guess_solution("wrong answer here".to_string());
-        assert!(!guess_result, "Expected a failure from the wrong guess");
-        assert_eq!(get_logs(), ["Try again."], "Expected a failure log.");
-        guess_result = contract.guess_solution("near nomicon ref finance".to_string());
-        assert!(guess_result, "Expected the correct answer to return true.");
-        assert_eq!(
-            get_logs(),
-            ["Try again.", "You guessed right!"],
-            "Expected a successful log after the previous failed log."
-        );
+        let blessing1 = contract.blessing_map.get(&"image1.gif".to_string()).unwrap();
+        assert_eq!(blessing1.price, 100_000_000_000_000_000_000_000);
     }
+
 }
