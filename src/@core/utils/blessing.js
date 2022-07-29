@@ -2,6 +2,9 @@ import { ethers } from 'ethers';
 import {toLocaleDateFromBigInt} from 'src/@core/utils/date'
 import {simpleShow, cryptoBlessingAdreess} from 'src/@core/components/wallet/address'
 import {encode} from 'src/@core/utils/cypher'
+import * as nearAPI from 'near-api-js';
+
+const { utils } = nearAPI;
 
 export const getBlessingTitle = (description) => {
     if (description != undefined && description.length > 0) {
@@ -22,16 +25,17 @@ export const getBlessingDesc = (description, omit = false) => {
 }
 
 export const transBlesingsFromWalletBlessings = (sender, blessings) => {
+    console.log('transBlesingsFromWalletBlessings', blessings)
     let newBlessings = []
     blessings.forEach(blessing => {
         newBlessings.push({
-            code: blessing.blessingID,
-            blessing: blessing.blessingImage,
-            time: toLocaleDateFromBigInt(blessing.sendTimestamp.toString()),
-            amount: parseFloat(ethers.utils.formatEther(blessing.tokenAmount)).toFixed(2),
-            quantity: blessing.claimQuantity.toString(),
-            type: blessing.claimType === 0 ? 'AVERAGE' : 'RANDOM',
-            progress: '/claim?sender=' + encode(sender) + '&blessing=' + encode(blessing.blessingID),
+            code: blessing.blessing_id,
+            blessing: blessing.blessing_image,
+            time: toLocaleDateFromBigInt(blessing.send_timestamp/1000000000),
+            amount: parseFloat(utils.format.formatNearAmount(blessing.token_amount)).toFixed(2),
+            quantity: blessing.claim_quantity.toString(),
+            type: blessing.claim_type,
+            progress: '/claim?sender=' + encode(sender) + '&blessing=' + encode(blessing.blessing_id),
             revoked: blessing.revoked
         })
     })

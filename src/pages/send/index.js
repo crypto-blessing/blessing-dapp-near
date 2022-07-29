@@ -8,7 +8,7 @@ import Button from '@mui/material/Button'
 import CardMedia from '@mui/material/CardMedia'
 import Typography from '@mui/material/Typography'
 import CardContent from '@mui/material/CardContent'
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import Icon from '@material-ui/core/Icon';
 import Modal from '@mui/material/Modal';
 import Grid from '@mui/material/Grid'
 import TextField from '@mui/material/TextField'
@@ -26,25 +26,25 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import Link from '@mui/material/Link';
 import Chip from '@mui/material/Chip';
+import Avatar from '@mui/material/Avatar';
 import CircularProgress from '@mui/material/CircularProgress';
+import * as nearAPI from 'near-api-js';
+import {generateSeedPhrase, parseSeedPhrase} from 'near-seed-phrase';
+import sha256 from 'js-sha256';
+import BN from 'bn.js';
 
 import { green } from '@mui/material/colors';
 
 // ** Icons Imports
-import {BUSD_ICON} from 'src/@core/components/wallet/crypto-icons'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import {decode} from 'src/@core/utils/cypher'
 
-import {getProviderUrl, simpleShow, cryptoBlessingAdreess, BUSDContractAddress} from 'src/@core/components/wallet/address'
 import {encode} from 'src/@core/utils/cypher'
 
 
-import { ethers } from 'ethers';
-import { useWeb3React } from "@web3-react/core"
-import CryptoBlessing from 'src/artifacts/contracts/CryptoBlessing.sol/CryptoBlessing.json'
-import BUSDContract from 'src/artifacts/contracts/TestBUSD.sol/BUSD.json'
-
 import { useRouter } from 'next/router'
+
+import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
 
 const style = {
   position: 'absolute',
@@ -56,6 +56,9 @@ const style = {
   boxShadow: 24,
   p: 4,
 };
+const { utils } = nearAPI;
+
+const DEFAULT_FUNCTION_CALL_GAS = new BN('30000000000000');
 
 // Styled Grid component
 const StyledGrid = styled(Grid)(({ theme }) => ({
@@ -73,9 +76,16 @@ const StyledGrid = styled(Grid)(({ theme }) => ({
 const BlessingSendPage = () => {
 
     const router = useRouter()
-    
+    const [tx, setTx] = useState(null)
+    const [nearConfig, setNearConfig] = useState(null)
+    const [currentUser, setCurrentUser] = useState('')
     useEffect (() => {
-        const { blessing } = router.query
+        const { blessing, transactionHashes, callbackBlessingID, errorCode } = router.query
+        if (!errorCode && transactionHashes) {
+            setTx(transactionHashes)
+            setSendSuccessOpen(true)
+            setBlessingID(callbackBlessingID)
+        }
         if (blessing) {
             fetch(`/api/items/fetchOneItem?image=${decode(blessing)}`)
                 .then((res) => res.json())
@@ -85,7 +95,6 @@ const BlessingSendPage = () => {
         }
     }, [router.query])
 
-    const { active, chainId, account } = useWeb3React()
 
     const [blessingInDB, setBlessingInDB] = useState({})
     const [open, setOpen] = useState(false);
@@ -95,18 +104,15 @@ const BlessingSendPage = () => {
     const [claimType, setClaimType] = useState(-1);
     const handleOpen = () => setOpen(true);
 
-    const [needApproveBUSDAmount, setNeedApproveBUSDAmount] = useState(BigInt(0))
-
     const [alertMsg, setAlertMsg] = useState('');
     const [alertOpen, setAlertOpen] = useState(false);
+    const [alertSeverity, setAlertSeverity] = useState('info');
 
 
     const [sending, setSending] = useState(false);
     const [approving, setApproving] = useState(false);
     const [sendSuccessOpen, setSendSuccessOpen] = useState(false);
-    const [blessingKeypairAddress, setBlessingKeypairAddress] = useState('');
-
-    const [loading, setLoading] = useState(false);
+    const [blessingID, setBlessingID] = useState('');
 
     const handleClose = () => {
         setOpen(false)
@@ -146,15 +152,14 @@ const BlessingSendPage = () => {
         let payCaption = '', claimCaption = '';
         if (tokenAmount > 0 && claimQuantity > 0) {
         let totalPay = (claimQuantity * blessingInDB.price) + parseFloat(tokenAmount)
-        refreshBUSDApprove(totalPay)
-        payCaption = `You will pay ${totalPay} BUSD. `
+        payCaption = `You will pay ${totalPay} ⓃNear. `
         } else {
         payCaption = ''
         }
         if (payCaption !== '') {
         if (claimType > -1) {
             if (claimType === 0) {
-            claimCaption = `Your friends will claim ${(tokenAmount / claimQuantity).toFixed(2)}(tax in) BUSD and one more NFT. `
+            claimCaption = `Your friends will claim ${(tokenAmount / claimQuantity).toFixed(2)}(tax in) ⓃNear and one more NFT. `
             } else if (claimType === 1) {
             claimCaption = `Your friends will claim a random amount and one more NFT.`
             }
@@ -165,143 +170,119 @@ const BlessingSendPage = () => {
         setBlessingCaption(payCaption + claimCaption)
     }
 
-    const refreshBUSDApprove = (totalPay) => {
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const busdContract = new ethers.Contract(BUSDContractAddress(chainId), BUSDContract.abi, provider.getSigner())
-        provider.getSigner().getAddress().then(async (address) => {
-        try {
-            const allowance = await busdContract.allowance(address, cryptoBlessingAdreess(chainId))
-            const busdAllownce = ethers.utils.formatEther(allowance)
-            console.log('totalBUSDArppoveAmount', totalPay)
-            console.log('busdAllownce', busdAllownce)
-            setNeedApproveBUSDAmount(BigInt((totalPay - busdAllownce) * 10 ** 18))
-        } catch (err) {
-            console.log("Error: ", err)
-        }
-        })
-    }
-
     const checkFormValidate = () => {
-        if (tokenAmount <= 0 || BigInt((claimQuantity * blessingInDB.price + parseFloat(tokenAmount)) * 10 ** 18) > busdAmount) {
-        setAlertMsg('You have insufficient BUSD balance.')
-        setAlertOpen(true);
+        const totalAmount = claimQuantity * blessingInDB.near_price + parseFloat(tokenAmount)
+        if (tokenAmount <= 0 || totalAmount > nearAmount) {
+          setAlertMsg('You have insufficient ⓃNEAR balance.')
+          setAlertOpen(true);
+          setAlertSeverity('error');
 
-        return false
+          return false
         }
         if (claimQuantity <= 0 || claimQuantity > 13) {
-        setAlertMsg('You only have up to 13 friends to collect your BUSD')
-        setAlertOpen(true);
-
-        return false
+          setAlertMsg('You only have up to 13 friends to collect your ⓃNEAR')
+          setAlertOpen(true);
+          setAlertSeverity('error');
+    
+          return false
         }
         if (claimType === -1) {
-        setAlertMsg('Pls choose the way your friend will claim your BUSD')
-        setAlertOpen(true);
-
-        return false
+          setAlertMsg('Pls choose the way your friend will claim your ⓃNEAR')
+          setAlertOpen(true);
+          setAlertSeverity('error');
+    
+          return false
         }
-
+    
         return true
-    }
-
-    async function approveBUSD() {
-        if (!checkFormValidate()) {
-        return
-        }
-        setApproving(true)
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const busdContract = new ethers.Contract(BUSDContractAddress(chainId), BUSDContract.abi, provider.getSigner())
-        try {
-        const tx = await busdContract.approve(cryptoBlessingAdreess(chainId), needApproveBUSDAmount)
-        await tx.wait()
-        refreshBUSDApprove((claimQuantity * blessingInDB.price) + parseFloat(tokenAmount))
-        setApproving(false)
-        setLoading(true)
-        } catch (e) {
-        console.log(e)
-        setApproving(false)
-        }
-        
-    }
-
-    async function storeKeys(blessingKeypair, claimKeys) {
+      }
+    
+      async function storeKeys(blessingID, blessingSec, claimKeys) {
         fetch('/api/blessing-sended', {
-        method: 'POST',
-        headers: {
+          method: 'POST',
+          headers: {
             'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+          },
+          body: JSON.stringify({
             image: blessingInDB.image,
             blessing: {
-            blessing_id: blessingKeypair.address,
-            private_key: blessingKeypair.privateKey
+              blessing_id: blessingID,
+              private_key: blessingSec
             },
             claimKeys: claimKeys
-        }),
+          }),
         }).then(res => {
-        console.log(res)
+          console.log(res)
         } ).catch(err => {
-        console.log(err)
-
+          console.log(err)
+    
         })
-    }
-
-    async function submitSendBlessing() {
+      }
+    
+      async function submitSendBlessing() {
         if (!checkFormValidate()) {
-        return
+          return
         }
         setSending(true)
+        const totalAmount = claimQuantity * blessingInDB.near_price + parseFloat(tokenAmount)
+        const totalAmountInYocto = utils.format.parseNearAmount(totalAmount + "")
         
         // start to send blessing
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const cbContract = new ethers.Contract(cryptoBlessingAdreess(chainId), CryptoBlessing.abi, provider.getSigner())
-        const blessingKeypair = ethers.Wallet.createRandom();
+        const walletConnection = await getWalletConnection()
         try {
-        let pubkeys = []
-        let claimKeys = []
-
-        // claim keys gen
-        for (let i = 0; i < claimQuantity; i++) {
-            const claimKeyPair = ethers.Wallet.createRandom();
-            pubkeys.push(claimKeyPair.address)
+          let hexes = []
+          let claimKeys = []
+          const blessingKeypair = generateSeedPhrase();
+          const blessingSec = blessingKeypair.secretKey;
+          const blessingID = blessingKeypair.publicKey;
+    
+          // claim keys gen
+          for (let i = 0; i < claimQuantity; i++) {
+            let seedPhrase = generateSeedPhrase();
+            hexes.push(sha256.sha256(seedPhrase.publicKey))
             claimKeys.push({
-            pubkey: claimKeyPair.address,
-            private_key: claimKeyPair.privateKey
+              pubkey: seedPhrase.publicKey,
+              private_key: sha256.sha256(seedPhrase.publicKey)
             })
-        }
+          }
+    
+          await storeKeys(blessingID, blessingSec, claimKeys)
+          localStorage.setItem('my_blessing_claim_key_' + blessingID, blessingSec)
 
-        await storeKeys(blessingKeypair, claimKeys)
-
-        const sendBlessingTx = await cbContract.sendBlessing(
-            blessingInDB.image, blessingKeypair.address, 
-            BigInt(tokenAmount * 10 ** 18), 
-            claimQuantity,
-            claimType,
-            pubkeys
-        )
-        await sendBlessingTx.wait();
-        setSending(false)
-        setBlessingKeypairAddress(blessingKeypair.address)
-        localStorage.setItem('my_blessing_claim_key_' + blessingKeypair.address, blessingKeypair.privateKey)
-        setOpen(false)
-        setSendSuccessOpen(true)
-        fetchBUSDAmount()
-        setLoading(true)
+          let functionCallResult = await walletConnection.account().functionCall({
+            contractId: nearConfig.contractName,
+            methodName: 'send_blessing',
+            args: {
+              blessing_image: blessingInDB.image, 
+              blessing_id: blessingID,
+              claim_quantity: parseInt(claimQuantity),
+              claim_type: claimType === 0 ? 'Average' : 'Random',
+              hexex: hexes
+            },
+            gas: DEFAULT_FUNCTION_CALL_GAS, // optional param, by the way
+            attachedDeposit: totalAmountInYocto, 
+            walletMeta: '', // optional param, by the way
+            walletCallbackUrl: document.location.toString() + '&callbackBlessingID=' + blessingID // optional param, by the way
+          });
+          if (functionCallResult && functionCallResult.transaction && functionCallResult.transaction.hash) {
+            console.log('Transaction hash for explorer', functionCallResult.transaction.hash)
+            setTransactionHash(functionCallResult.transaction.hash);
+          }
         } catch (e) {
-        console.log(e)
-        setAlertMsg('Something went wrong. Please contact admin in telegram.')
-        setAlertOpen(true);
-        setSending(false)
+          console.log(e)
+          setAlertMsg('Something went wrong. Please contact admin in telegram.')
+          setAlertOpen(true);
+          setAlertSeverity('error');
+          setSending(false)
         }
         
-    }
+      }
 
     const copyClaimLink = () => {
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        provider.getSigner().getAddress().then(async (address) => {
-        const privateKey = localStorage.getItem('my_blessing_claim_key_' + blessingKeypairAddress)
-        navigator.clipboard.writeText(`[CryptoBlessing] ${blessingInDB.title} | ${blessingInDB.description}. Claim your BUSD & blessing NFT here: https://cryptoblessing.app/claim?sender=${encode(address)}&blessing=${encode(blessingKeypairAddress)}&key=${encode(privateKey)}`)
-        })
+        const privateKey = localStorage.getItem('my_blessing_claim_key_' + blessingID)
+        navigator.clipboard.writeText(`[CryptoBlessing] ${blessingInDB.title} | ${blessingInDB.description}. Claim your ⓃNear & blessing NFT here: https://near.cryptoblessing.app/claim?sender=${encode(currentUser)}&blessing=${encode(blessingID)}&key=${encode(privateKey)}`)
+        setAlertMsg('Claim Link Copied.')
+        setAlertOpen(true);
     }
 
     const handleSendSuccessClose = () => {
@@ -315,27 +296,27 @@ const BlessingSendPage = () => {
         setAlertOpen(false)
     }
 
-    const [busdAmount, setBusdAmount] = useState(0)
+    const [nearAmount, setNearAmount] = useState(0)
 
-    async function fetchBUSDAmount() {
-        if (active && chainId != 'undefined' && typeof window.ethereum !== 'undefined') {
-            const provider = new ethers.providers.Web3Provider(window.ethereum)
-            const busdContract = new ethers.Contract(BUSDContractAddress(chainId), BUSDContract.abi, provider.getSigner())
-            provider.getSigner().getAddress().then(async (address) => {
-                try {
-                    setBusdAmount(await busdContract.balanceOf(address))
-                } catch (err) {
-                    console.log("Error: ", err)
-                }
-            })
-            
-        }    
+    async function fetchNearAmount() {
+        const walletConnection = await getWalletConnection()
+        walletConnection.account().getAccountBalance().then(async (balance) => {
+          setNearAmount(parseFloat(utils.format.formatNearAmount(balance.available)).toFixed(2))
+        })
+          
     }
 
     useEffect(() => {
-        fetchBUSDAmount()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chainId, account])
+        fetchNearAmount()
+    }, [])
+
+    useEffect(() => {
+        const connectWalletOnPageLoad = async () => {
+            setNearConfig(await getNearConfig())
+            setCurrentUser(await getCurrentUser())
+        }
+        connectWalletOnPageLoad()
+    }, [])
 
     return (
         <Grid container spacing={6}>
@@ -369,13 +350,13 @@ const BlessingSendPage = () => {
                         <Typography sx={{ fontWeight: 500, marginBottom: 3 }}>
                             Designer:{' '}
                             <Box component='span' sx={{ fontWeight: 'bold' }}>
-                            {simpleShow(blessingInDB.owner)}
+                            {blessingInDB.near_owner}
                             </Box>
                         </Typography>
                         </CardContent>
                         <CardActions className='card-action-dense'>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                        <Button startIcon={<AttachMoneyIcon />} variant='outlined' color='warning'>{blessingInDB.price} BUSD</Button>
+                            <Chip variant="outlined" avatar={<Avatar>Ⓝ</Avatar>} color="secondary" label={blessingInDB.near_price} />
                         </Box>
                         </CardActions>
                     </Grid>
@@ -389,18 +370,17 @@ const BlessingSendPage = () => {
                             <TextField
                             onChange={handleTokenAmountChange}
                             fullWidth
-                            label={'How much BUSD do you want to send?(wallet: ' + parseFloat(ethers.utils.formatEther(busdAmount)).toFixed(2) + ' BUSD)'}
+                            label={'How much ⓃNear do you want to send?(wallet: ' + nearAmount + ' ⓃNEAR)'}
                             placeholder='10'
                             type='number'
                             InputProps={{
                                 startAdornment: (
                                 <InputAdornment position='start'>
-                                    <BUSD_ICON />
-                                </InputAdornment>
+                                    <Icon>Ⓝ</Icon>
+                                  </InputAdornment>
                                 )
                             }}
                             />
-                            <Typography variant='caption'>help? <Link target='_blank' href='https://pancakeswap.finance/swap?outputCurrency=0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56'>PancakeSwap</Link> for BUSD</Typography>
                         </Grid>
                         
                         <Grid item xs={12}>
@@ -421,7 +401,7 @@ const BlessingSendPage = () => {
                         </Grid>
                         <Grid item xs={12}>
                             <FormControl>
-                            <FormLabel id="demo-row-radio-buttons-group-label">The way they claim your BUSD?</FormLabel>
+                            <FormLabel id="demo-row-radio-buttons-group-label">The way they claim your ⓃNear?</FormLabel>
                             <RadioGroup
                                 onChange={handleClaimTypeChange}
                                 row
@@ -453,28 +433,6 @@ const BlessingSendPage = () => {
                     <Button onClick={handleClose} size='large' color='secondary' variant='outlined'>
                         Cancel
                     </Button>
-                    {needApproveBUSDAmount > 0 
-                    ?
-                    <Box sx={{ m: 1, position: 'relative' }}>
-                        <Button onClick={approveBUSD} disabled={approving} color='info' size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
-                        {approving ? 'Waiting for approve transaction...' : 'Approve BUSD'}
-                        </Button>
-                        {approving && (
-                        <CircularProgress
-                            color="secondary"
-                            size={24}
-                            sx={{
-                            color: 'green[500]',
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            marginTop: '-12px',
-                            marginLeft: '-12px',
-                            }}
-                        />
-                        )}
-                    </Box>
-                    :
                     <Box sx={{ m: 1, position: 'relative' }}>
                         <Button onClick={submitSendBlessing} disabled={sending} size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
                         {sending ? 'Waiting for send transaction...' : 'Send Blessing'}
@@ -494,7 +452,6 @@ const BlessingSendPage = () => {
                         />
                         )}
                     </Box>
-                    }
                     
                     </CardActions>
                 </Card>
@@ -511,15 +468,19 @@ const BlessingSendPage = () => {
                 <Card>
                     <CardMedia sx={{ height: '14.5625rem' }} image='/images/blessings/congrats.webp' />
                     <CardContent>
-                    <Typography variant='h6' sx={{ marginBottom: 2 }}>
-                        Congratulations!
-                    </Typography>
-                    <Typography variant='body2'>
-                        You have already sended this blessing successfully. Pls copy the claim link and share it with your friends.
-                    </Typography>
-                    <Typography variant='caption' color='error'>
-                        FYI, only use this claim link can claim your blessing!
-                    </Typography>
+                        <Typography variant='h6' sx={{ marginBottom: 2 }}>
+                            Congratulations!
+                        </Typography>
+                        <Typography variant='body2'>
+                            You have already sended this blessing successfully. Pls copy the claim link and share it with your friends.
+                        </Typography>
+                        <Typography variant='caption' color='error'>
+                            FYI, only use this claim link can claim your blessing!
+                        </Typography>
+                        <br />
+                        <Typography variant='caption'>
+                            <Link target='_blank' href={nearConfig?.explorerUrl + '/transactions/' + tx}>See the transaction on Near</Link>
+                        </Typography>
                     </CardContent>
                     <CardActions
                     sx={{
@@ -546,7 +507,7 @@ const BlessingSendPage = () => {
                 open={alertOpen} 
                 onClose={handleAlertClose}
                 autoHideDuration={4000}>
-                <Alert onClose={handleAlertClose} severity="error" sx={{ width: '100%', bgcolor: 'white' }}>
+                <Alert onClose={handleAlertClose} severity={alertSeverity} sx={{ width: '100%', bgcolor: 'white' }}>
                 {alertMsg}
                 <Link target='_blank' href="https://t.me/crypto_blessing_eng" underline="always">Find admin in telegram</Link>
                 </Alert>

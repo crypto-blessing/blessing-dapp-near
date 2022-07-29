@@ -12,22 +12,20 @@ import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TablePagination from '@mui/material/TablePagination'
 import Box from '@mui/material/Box'
-import {BUSD_ICON} from 'src/@core/components/wallet/crypto-icons'
 import Chip from '@mui/material/Chip'
 import Badge from '@mui/material/Badge';
+import Avatar from '@mui/material/Avatar';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import { ethers } from 'ethers'
 import { useWeb3React } from "@web3-react/core"
-import CryptoBlessing from 'src/artifacts/contracts/CryptoBlessing.sol/CryptoBlessing.json'
+
+import{ viewMethodOnContract } from 'src/@core/configs/utils'
+import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
 
 
-
-import {cryptoBlessingAdreess} from 'src/@core/components/wallet/address'
 import {transBlesingsFromWalletBlessings} from 'src/@core/utils/blessing.js'
 
 
 import { useEffect, useState } from "react"
-import { Button } from '@mui/material'
 
 
 const columns = [
@@ -46,6 +44,9 @@ const BlessingSended = () => {
     const [blessings, setBlessings] = useState([])
     const [rowsPerPage, setRowsPerPage] = useState(10)
 
+    const [nearConfig, setNearConfig] = useState(null)
+    const [currentUser, setCurrentUser] = useState('')
+
     const handleChangePage = (event, newPage) => {
         setPage(newPage)
     }
@@ -60,23 +61,25 @@ const BlessingSended = () => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     async function fetchMySendedBlessings() {
-        if (active && chainId != 'undefined' && typeof window.ethereum !== 'undefined') {
-            const provider = new ethers.providers.Web3Provider(window.ethereum)
-            const cbContract = new ethers.Contract(cryptoBlessingAdreess(chainId), CryptoBlessing.abi, provider.getSigner())
+        
+    }
+
+
+    useEffect(() => {
+        const connectWalletOnPageLoad = async () => {
             try {
-                const blessings = await cbContract.getMySendedBlessings()
-                setBlessings(transBlesingsFromWalletBlessings(account, blessings))
+                setNearConfig(await getNearConfig())
+                setCurrentUser(await getCurrentUser())
+                if (currentUser) {
+                    const chainData = await viewMethodOnContract(nearConfig, 'my_sended_blessings', '{"sender": "' + currentUser + '"}');
+                    setBlessings(transBlesingsFromWalletBlessings(currentUser, chainData))
+                }
             } catch (err) {
                 console.log("Error: ", err)
             }
-            
-        }    
-    }
-
-    useEffect(() => {
-        fetchMySendedBlessings()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chainId, account])
+        }
+        connectWalletOnPageLoad()
+    }, [currentUser])
 
     return (
         <Grid container spacing={6}>
@@ -128,7 +131,7 @@ const BlessingSended = () => {
                                         {column.type === undefined ? value : ''}
 
                                         {column.type === 'amount' ?
-                                        <Chip variant="outlined" color="warning" label={value} icon={<BUSD_ICON />} />
+                                        <Chip variant="outlined" avatar={<Avatar>Ⓝ</Avatar>} color="secondary" label={value} />
                                         : ''}
 
                                         {column.type == 'quantity' ?
