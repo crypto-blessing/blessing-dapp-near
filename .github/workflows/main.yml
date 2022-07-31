@@ -1,0 +1,29 @@
+name: Deploy
+on:
+  push:
+    branches:
+    - main
+
+jobs:
+  build_job:
+    runs-on: ubuntu-latest
+    name: build
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 16
+      - run: export NODE_ENV=development
+      - run: npm install -g yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
+
+      - name: deploy file to server
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-rltgoDzvO"
+          SOURCE: "out/"
+          REMOTE_HOST: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: "root"
+          TARGET: "/var/www/blessing-dapp-near/"
