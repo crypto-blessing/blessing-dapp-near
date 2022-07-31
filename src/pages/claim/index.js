@@ -662,7 +662,7 @@ const ClaimPage = () => {
               <Button onClick={handleClaimSuccessClose} size='large' color='secondary' variant='outlined'>
                 Cancel
               </Button>
-              <Button href="https://wallet.near.org/" target='_blank' size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
+              <Button href={nearConfig.walletUrl} target='_blank' size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
                 To NEAR Wallet
               </Button>
             </CardActions>

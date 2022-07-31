@@ -1,5 +1,5 @@
 {
-  "name": "blessing-dapp",
+  "name": "blessing-dapp-near",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -25,12 +25,17 @@
     "apexcharts-clevision": "3.28.5",
     "babel-eslint": "^10.1.0",
     "babel-plugin-styled-components": "^2.0.7",
+    "bs58": "^4.0.1",
     "chai": "^4.3.6",
     "clsx": "^1.1.1",
     "dotenv": "^16.0.1",
     "env-cmd": "^10.1.0",
+    "js-sha256": "^0.9.0",
     "mdi-material-ui": "^7.1.0",
     "moralis": "^1.8.0",
+    "muicss": "^0.10.3",
+    "near-api-js": "^0.42.0",
+    "near-seed-phrase": "github:near/near-seed-phrase",
     "next": "12.0.4",
     "nprogress": "^0.2.0",
     "react": "17.0.2",
@@ -39,11 +44,7 @@
     "react-dom": "17.0.2",
     "react-moralis": "^1.4.0",
     "react-perfect-scrollbar": "^1.5.8",
-    "react-popper": "^2.2.5",
-    "bs58": "^4.0.1",
-    "js-sha256": "^0.9.0",
-    "near-api-js": "^0.42.0",
-    "near-seed-phrase": "github:near/near-seed-phrase"
+    "react-popper": "^2.2.5"
   },
   "scripts": {
     "dev": "next dev",

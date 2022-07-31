@@ -133,7 +133,7 @@ const Wallet = () => {
                 </Card>
                 <Card>
                     <CardContent>
-                        <Typography variant='caption'>See my NEP-141 Tokens on <Link target='_blank' href='https://wallet.near.org/'>NEAR Wallet Page</Link></Typography>
+                        <Typography variant='caption'>See my NEP-141 Tokens on <Link target='_blank' href={nearConfig.walletUrl}>NEAR Wallet Page</Link></Typography>
                     </CardContent>
                 </Card>
                 

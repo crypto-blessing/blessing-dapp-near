@@ -15,7 +15,7 @@ export const getWalletConnection = async () => {
 }
 
 export const getNearConfig = async () => {
-    return getConfig(process.env.NEAR_ENV || 'testnet');
+    return getConfig('testnet');
 }
 
 export const getCurrentUser = async () => {

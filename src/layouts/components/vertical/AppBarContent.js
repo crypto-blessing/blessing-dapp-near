@@ -10,6 +10,10 @@ import Divider from '@mui/material/Divider'
 import Link from '@mui/material/Link'
 import Twitter from 'mdi-material-ui/Twitter'
 import Telegram from '@mui/icons-material/Telegram';
+import Menu2 from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+
 
 import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
 
@@ -32,6 +36,24 @@ import DialogTitle from '@mui/material/DialogTitle';
 
 
 const AppBarContent = props => {
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const menuOpen = Boolean(anchorEl);
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleBSCClose = () => {
+    setAnchorEl(null);
+    window.open("https://cryptoblessing.app/","_blank");
+  }
+
+
   const [alertTitle, setAlertTitle] = useState('')
   const [alertMessage, setAlertMessage] = useState('')
   const [currentUser, setCurrentUser] = useState('')
@@ -103,6 +125,31 @@ const AppBarContent = props => {
             )
           }}
         /> */}
+        <div>
+          <Button
+            id="basic-button"
+            onClick={handleClick}
+            aria-controls={menuOpen ? 'demo-customized-menu' : undefined}
+            aria-haspopup="true"
+            aria-expanded={menuOpen ? 'true' : undefined}
+            variant="contained"
+            disableElevation
+            endIcon={<KeyboardArrowDownIcon />}
+          >
+            Other Chains
+          </Button>
+          <Menu2
+            id="basic-menu"
+            anchorEl={anchorEl}
+            open={menuOpen}
+            onClose={handleMenuClose}
+            MenuListProps={{
+              'aria-labelledby': 'basic-button',
+            }}
+          >
+            <MenuItem onClick={handleBSCClose}>Binance Smart Chain</MenuItem>
+          </Menu2>
+        </div>
       </Box>
       <Box className='actions-right' sx={{ display: 'flex', alignItems: 'center' }}>
 

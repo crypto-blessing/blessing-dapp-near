@@ -5,14 +5,14 @@ use std::str::FromStr;
 use near_sdk::collections::{LookupMap};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    ext_contract, log,
+    ext_contract,
     serde::{Deserialize, Serialize},
-    AccountId, PanicOnDefault, Promise
+    AccountId, PanicOnDefault, Promise, PromiseResult
 };
 use near_sdk::{json_types::U128, env, near_bindgen, PublicKey};
 use near_sdk::json_types::Base64VecU8;
 use near_sdk::{serde_json};
-use constants::{ONE_YOCTO, GAS_FOR_FT_TRANSFER, GAS_FOR_NFT_TRANSFER, DEPOSIT_FOR_NFT_MINT, GAS_FOR_ACCOUNT_CREATION};
+use constants::{ONE_YOCTO, GAS_FOR_FT_TRANSFER, GAS_FOR_NFT_TRANSFER, DEPOSIT_FOR_NFT_MINT, GAS_FOR_ACCOUNT_CREATION, GAS_FOR_ACCOUNT_CALLBACK};
 use near_contract_standards::non_fungible_token::{TokenId};
 use near_contract_standards::non_fungible_token::metadata::{
     TokenMetadata,
@@ -41,6 +41,22 @@ pub trait ExtNft {
 #[ext_contract(ext_linkdrop)]
 pub trait ExtLinkDropCrossContract {
     fn create_account(&mut self, new_account_id: AccountId, new_public_key: PublicKey) -> Promise;
+}
+
+pub trait AfterClaim {
+    fn callback_after_create_account(
+        &mut self,
+        new_pk: PublicKey,
+        sender: AccountId,
+        claimer: AccountId,
+        blessing_id: String,
+        blessing: Blessing,
+        choosed_blessing: SenderBlessing,
+        distribution_amount: u128,
+        claim_key: String,
+        title: String,
+        description: String,
+    ) -> bool;
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Debug, Clone)]
@@ -146,7 +162,119 @@ impl CryptoBlessing {
         return random.into()
     }
 
+    #[private]
+    fn finalize_blessing_status(
+        &mut self,
+        new_pk: PublicKey,
+        sender: AccountId,
+        claimer: AccountId,
+        blessing_id: String,
+        blessing: Blessing,
+        choosed_blessing: SenderBlessing,
+        distribution_amount: u128,
+        claim_key: String,
+        title: String,
+        description: String,
+    ) {
+        let mut claimer_blessings = self.claimer_blessings.get(&claimer).unwrap_or_default();
+        claimer_blessings.push(ClaimerBlessing {
+            sender: sender.clone(),
+            blessing_id: blessing_id.clone(),
+            blessing_image: choosed_blessing.blessing_image.clone(),
+            claim_timestamp: env::block_timestamp(),
+            claim_amount: near_sdk::json_types::U128(distribution_amount / 1000 * (1000 - self.claim_tax_rate as u128)),
+            tax_amount: near_sdk::json_types::U128(distribution_amount / 1000 * self.claim_tax_rate as u128),
+        });
+        self.claimer_blessings.insert(&claimer, &claimer_blessings);
+
+        let mut cbt_token_reward = distribution_amount * self.cbt_reward_ratio as u128;
+        if cbt_token_reward > self.cbt_reward_max {
+            cbt_token_reward = self.cbt_reward_max;
+        }
+        let mut blessing_claim_status = self.blessing_claim_status.get(&blessing_id).unwrap_or_default();
+        blessing_claim_status.push(BlessingClaimStatus { 
+            claimer: claimer.clone(), 
+            claim_timestamp: env::block_timestamp(), 
+            distributed_amount: near_sdk::json_types::U128(distribution_amount), 
+            claim_amount: near_sdk::json_types::U128(distribution_amount / 1000 * (1000 - self.claim_tax_rate as u128)), 
+            tax_amount: near_sdk::json_types::U128(distribution_amount / 1000 * self.claim_tax_rate as u128), 
+            cbt_token_reward_to_sender_amount: near_sdk::json_types::U128(cbt_token_reward) 
+        });
+        self.blessing_claim_status.insert(&blessing_id, &blessing_claim_status);
+
+        Promise::new(env::current_account_id()).transfer(distribution_amount / 1000 * self.claim_tax_rate as u128);
+
+        // ext_ft::ft_transfer(sender, near_sdk::json_types::U128(cbt_token_reward), None, self.cbt_token_id.clone(), ONE_YOCTO, GAS_FOR_FT_TRANSFER);
+        // ext_nft::nft_mint(claimer, token_id, token_uri, account_id, balance, gas);
+        ext_ft::ext(self.cbt_token_id.clone())
+            .with_attached_deposit(ONE_YOCTO)
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .ft_transfer(sender, near_sdk::json_types::U128(cbt_token_reward), None);
+
+        ext_nft::ext(self.nft_token_id.clone())
+            .with_attached_deposit(DEPOSIT_FOR_NFT_MINT)
+            .with_static_gas(GAS_FOR_NFT_TRANSFER)
+            .nft_mint(claim_key, claimer.clone(), TokenMetadata { 
+                title: Some(title), 
+                description: Some(description),
+                media: Some(blessing.ipfs), 
+                copies: Some(1), 
+                media_hash: None, issued_at: None, expires_at: None, starts_at: None, updated_at: None, extra: None, reference:None, reference_hash:None
+            });
+            
+        // Delete full access call
+        Promise::new(env::current_account_id()).delete_key(new_pk.clone());
+
+    }
 }
+
+#[near_bindgen]
+impl AfterClaim for CryptoBlessing {
+
+    #[private]
+    fn callback_after_create_account(
+        &mut self,
+        new_pk: PublicKey,
+        sender: AccountId,
+        claimer: AccountId,
+        blessing_id: String,
+        blessing: Blessing,
+        choosed_blessing: SenderBlessing,
+        distribution_amount: u128,
+        claim_key: String,
+        title: String,
+        description: String,
+    ) -> bool {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "Expected 1 promise result."
+        );
+        match env::promise_result(0) {
+            PromiseResult::NotReady => {
+                unreachable!()
+            }
+            PromiseResult::Successful(creation_result) => {
+                let creation_succeeded: bool = serde_json::from_slice(&creation_result)
+                    .expect("Could not turn result from account creation into boolean.");
+                if creation_succeeded {
+                    // New account created and reward transferred successfully.
+                    self.finalize_blessing_status(new_pk, sender, claimer, blessing_id, blessing, choosed_blessing, distribution_amount, claim_key, title, description);
+                    true
+                } else {
+                    // Something went wrong trying to create the new account.
+                    false
+                }
+            }
+            PromiseResult::Failed => {
+                // Problem with the creation transaction, reward money has been returned to this contract.
+                false
+            }
+        }
+    }
+
+}
+
 
 #[near_bindgen]
 impl CryptoBlessing {
@@ -484,7 +612,7 @@ impl CryptoBlessing {
             .get(&choosed_blessing.blessing_image)
             .expect("Blessing not found");
 
-        let mut blessing_claim_status = self.blessing_claim_status.get(&blessing_id).unwrap_or_default();
+        let blessing_claim_status = self.blessing_claim_status.get(&blessing_id).unwrap_or_default();
         assert!(blessing_claim_status.len() < choosed_blessing.claim_quantity as usize, "Claim quantity is exceeded");
 
         let mut distributed_amount = 0;
@@ -510,61 +638,15 @@ impl CryptoBlessing {
 
         assert!(distribution_amount > DEPOSIT_FOR_NFT_MINT, "Distribution amount is too low");
 
-        let claimer = AccountId::new_unchecked(new_acc_id.clone());
-
-        let mut claimer_blessings = self.claimer_blessings.get(&claimer).unwrap_or_default();
-        claimer_blessings.push(ClaimerBlessing {
-            sender: sender.clone(),
-            blessing_id: blessing_id.clone(),
-            blessing_image: choosed_blessing.blessing_image.clone(),
-            claim_timestamp: env::block_timestamp(),
-            claim_amount: near_sdk::json_types::U128(distribution_amount / 1000 * (1000 - self.claim_tax_rate as u128)),
-            tax_amount: near_sdk::json_types::U128(distribution_amount / 1000 * self.claim_tax_rate as u128),
-        });
-        self.claimer_blessings.insert(&claimer, &claimer_blessings);
-
-        let mut cbt_token_reward = distribution_amount * self.cbt_reward_ratio as u128;
-        if cbt_token_reward > self.cbt_reward_max {
-            cbt_token_reward = self.cbt_reward_max;
-        }
-
-        blessing_claim_status.push(BlessingClaimStatus { 
-            claimer: claimer.clone(), 
-            claim_timestamp: env::block_timestamp(), 
-            distributed_amount: near_sdk::json_types::U128(distribution_amount), 
-            claim_amount: near_sdk::json_types::U128(distribution_amount / 1000 * (1000 - self.claim_tax_rate as u128)), 
-            tax_amount: near_sdk::json_types::U128(distribution_amount / 1000 * self.claim_tax_rate as u128), 
-            cbt_token_reward_to_sender_amount: near_sdk::json_types::U128(cbt_token_reward) 
-        });
-        self.blessing_claim_status.insert(&blessing_id, &blessing_claim_status);
-
         ext_linkdrop::ext(AccountId::from(self.creator_account.clone()))
             .with_attached_deposit((distribution_amount - DEPOSIT_FOR_NFT_MINT) / 1000 * (1000 - self.claim_tax_rate as u128))
             .with_static_gas(GAS_FOR_ACCOUNT_CREATION) // This amount of gas will be split
             .create_account(new_acc_id.parse().unwrap(), new_pk.clone())
             .then(
-                Promise::new(env::current_account_id()).delete_key(new_pk.clone()),
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_ACCOUNT_CALLBACK)
+                    .callback_after_create_account(new_pk, sender, AccountId::new_unchecked(new_acc_id.to_string()), blessing_id, blessing, choosed_blessing.clone(), distribution_amount, claim_key, title, description),
             );
-
-        Promise::new(env::current_account_id()).transfer(distribution_amount / 1000 * self.claim_tax_rate as u128);
-
-        // ext_ft::ft_transfer(sender, near_sdk::json_types::U128(cbt_token_reward), None, self.cbt_token_id.clone(), ONE_YOCTO, GAS_FOR_FT_TRANSFER);
-        // ext_nft::nft_mint(claimer, token_id, token_uri, account_id, balance, gas);
-        ext_ft::ext(self.cbt_token_id.clone())
-            .with_attached_deposit(ONE_YOCTO)
-            .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .ft_transfer(sender, near_sdk::json_types::U128(cbt_token_reward), None);
-
-        ext_nft::ext(self.nft_token_id.clone())
-            .with_attached_deposit(DEPOSIT_FOR_NFT_MINT)
-            .with_static_gas(GAS_FOR_NFT_TRANSFER)
-            .nft_mint(claim_key, claimer.clone(), TokenMetadata { 
-                title: Some(title), 
-                description: Some(description),
-                media: Some(blessing.ipfs), 
-                copies: Some(1), 
-                media_hash: None, issued_at: None, expires_at: None, starts_at: None, updated_at: None, extra: None, reference:None, reference_hash:None
-            });
 
     }
 
@@ -616,9 +698,6 @@ mod tests {
         // Set up contract object and call the new method
         let mut contract = CryptoBlessing::new(alice.clone(), testnet.clone());
 
-        let my_blessings = contract.my_sended_blessings(alice.clone());
-
-        log!("My blessings: {:?}", my_blessings);
 
         // Add blessings
         // contract.new_blessings(Base64VecU8("ewogICAgImltYWdlcyI6IFsKICAgICAgICAibGF6eV9sb3ZlLmdpZiIsCiAgICAgICAgImdvZGRlc3NfYmxlc3NpbmcuZ2lmIiwKICAgICAgICAiSV9hZG9yZV95b3UuZ2lmIiwKICAgICAgICAiMTJfbG92ZS5naWYiLAogICAgICAgICJtaXJhYmlsaXNfbGFkeS5naWYiLAogICAgICAgICJZT1UrTUUuZ2lmIgogICAgXSwKICAgICJibGVzc2luZ3MiOiBbCiAgICAgICAgewogICAgICAgICAgICAicHJpY2UiOiAiMTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwKICAgICAgICAgICAgIm93bmVyX2lkIjogImNyeXB0b19ibGVzc2luZ185NTI3LnRlc3RuZXQiLAogICAgICAgICAgICAiZGVsZXRlZCI6IDAsCiAgICAgICAgICAgICJ0YXhfcmF0ZSI6IDEwCiAgICAgICAgfSwKICAgICAgICB7CiAgICAgICAgICAgICJwcmljZSI6ICI1MDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsCiAgICAgICAgICAgICJvd25lcl9pZCI6ICJjcnlwdG9fYmxlc3NpbmdfOTUyNy50ZXN0bmV0IiwKICAgICAgICAgICAgImRlbGV0ZWQiOiAwLAogICAgICAgICAgICAidGF4X3JhdGUiOiAxMAogICAgICAgIH0sCiAgICAgICAgewogICAgICAgICAgICAicHJpY2UiOiAiNTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAib3duZXJfaWQiOiAiY3J5cHRvX2JsZXNzaW5nXzk1MjcudGVzdG5ldCIsCiAgICAgICAgICAgICJkZWxldGVkIjogMCwKICAgICAgICAgICAgInRheF9yYXRlIjogMTAKICAgICAgICB9LAogICAgICAgIHsKICAgICAgICAgICAgInByaWNlIjogIjUwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwKICAgICAgICAgICAgIm93bmVyX2lkIjogImNyeXB0b19ibGVzc2luZ185NTI3LnRlc3RuZXQiLAogICAgICAgICAgICAiZGVsZXRlZCI6IDAsCiAgICAgICAgICAgICJ0YXhfcmF0ZSI6IDEwCiAgICAgICAgfSwKICAgICAgICB7CiAgICAgICAgICAgICJwcmljZSI6ICI1MDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsCiAgICAgICAgICAgICJvd25lcl9pZCI6ICJjcnlwdG9fYmxlc3NpbmdfOTUyNy50ZXN0bmV0IiwKICAgICAgICAgICAgImRlbGV0ZWQiOiAwLAogICAgICAgICAgICAidGF4X3JhdGUiOiAxMAogICAgICAgIH0sCiAgICAgICAgewogICAgICAgICAgICAicHJpY2UiOiAiMTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwKICAgICAgICAgICAgIm93bmVyX2lkIjogImNyeXB0b19ibGVzc2luZ185NTI3LnRlc3RuZXQiLAogICAgICAgICAgICAiZGVsZXRlZCI6IDAsCiAgICAgICAgICAgICJ0YXhfcmF0ZSI6IDEwCiAgICAgICAgfQogICAgXQp9".as_bytes().to_vec()));
@@ -633,10 +712,6 @@ mod tests {
         // log!("env::account_balance: {:?}", env::account_balance());
         // contract.send_blessing("image1.gif".to_string(), "blessing_id".to_string(), 2, ClaimType::Random, vec!["123".to_string(), "456".to_string()]);
         
-        let my_blessings2 = contract.my_sended_blessings(alice.clone());
-        log!("My blessings: {:?}", my_blessings2);
-
-        log!(" env::block_timestamp() {:?}",  env::block_timestamp());
 
 
     }
