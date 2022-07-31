@@ -14,13 +14,13 @@ import TablePagination from '@mui/material/TablePagination'
 import Box from '@mui/material/Box'
 import {BUSD_ICON} from 'src/@core/components/wallet/crypto-icons'
 import Chip from '@mui/material/Chip'
-import { ethers } from 'ethers'
-import { useWeb3React } from "@web3-react/core"
-import CryptoBlessing from 'src/artifacts/contracts/CryptoBlessing.sol/CryptoBlessing.json'
+import Avatar from '@mui/material/Avatar';
+
+import{ viewMethodOnContract } from 'src/@core/configs/utils'
+import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
 
 
 
-import {cryptoBlessingAdreess} from 'src/@core/components/wallet/address'
 import {transClaimBlesingsFromWalletBlessings} from 'src/@core/utils/blessing.js'
 
 import { useEffect, useState } from "react"
@@ -41,6 +41,9 @@ const BlessingClaimed = () => {
     const [blessings, setBlessings] = useState([])
     const [rowsPerPage, setRowsPerPage] = useState(10)
 
+    const [nearConfig, setNearConfig] = useState(null)
+    const [currentUser, setCurrentUser] = useState('')
+
     const handleChangePage = (event, newPage) => {
         setPage(newPage)
     }
@@ -50,28 +53,23 @@ const BlessingClaimed = () => {
         setPage(0)
     }
 
-
-    const { active, account, chainId } = useWeb3React()
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    async function fetchMyClaimedBlessings() {
-        if (active && chainId != 'undefined' && typeof window.ethereum !== 'undefined') {
-            const provider = new ethers.providers.Web3Provider(window.ethereum)
-            const cbContract = new ethers.Contract(cryptoBlessingAdreess(chainId), CryptoBlessing.abi, provider.getSigner())
+    useEffect(() => {
+        const connectWalletOnPageLoad = async () => {
             try {
-                const blessings = await cbContract.getMyClaimedBlessings()
-                setBlessings(transClaimBlesingsFromWalletBlessings(blessings))
+                setNearConfig(await getNearConfig())
+                setCurrentUser(await getCurrentUser())
+                if (currentUser) {
+                    const chainData = await viewMethodOnContract(nearConfig, 'my_claimed_blessings', '{"claimer": "' + currentUser + '"}');
+                    console.log(chainData)
+                    setBlessings(transClaimBlesingsFromWalletBlessings(chainData))
+                }
             } catch (err) {
                 console.log("Error: ", err)
             }
-            
-        }    
-    }
-
-    useEffect(() => {
-        fetchMyClaimedBlessings()
+        }
+        connectWalletOnPageLoad()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chainId, account])
+    }, [currentUser])
 
     return (
         <Grid container spacing={6}>
@@ -115,7 +113,7 @@ const BlessingClaimed = () => {
                                         : ''}
 
                                         {column.type === 'amount' ?
-                                        <Chip variant="outlined" color="warning" label={value} icon={<BUSD_ICON />} />
+                                        <Chip variant="outlined" color="secondary" label={value} icon={<Avatar sx={{ width: 24, height: 24 }}>Ⓝ</Avatar>} />
                                         : ''}
 
                                         {column.type === 'progress' ?

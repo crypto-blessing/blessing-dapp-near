@@ -16,7 +16,6 @@ import Chip from '@mui/material/Chip'
 import Badge from '@mui/material/Badge';
 import Avatar from '@mui/material/Avatar';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import { useWeb3React } from "@web3-react/core"
 
 import{ viewMethodOnContract } from 'src/@core/configs/utils'
 import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
@@ -54,14 +53,6 @@ const BlessingSended = () => {
     const handleChangeRowsPerPage = event => {
         setRowsPerPage(+event.target.value)
         setPage(0)
-    }
-
-
-    const { active, account, chainId } = useWeb3React()
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    async function fetchMySendedBlessings() {
-        
     }
 
 
@@ -131,7 +122,7 @@ const BlessingSended = () => {
                                         {column.type === undefined ? value : ''}
 
                                         {column.type === 'amount' ?
-                                        <Chip variant="outlined" avatar={<Avatar>Ⓝ</Avatar>} color="secondary" label={value} />
+                                        <Chip variant="outlined" avatar={<Avatar sx={{ width: 24, height: 24 }}>Ⓝ</Avatar>} color="secondary" label={value} />
                                         : ''}
 
                                         {column.type == 'quantity' ?

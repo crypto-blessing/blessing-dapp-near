@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import {toLocaleDateFromBigInt} from 'src/@core/utils/date'
-import {simpleShow, cryptoBlessingAdreess} from 'src/@core/components/wallet/address'
+import {simpleShowNear, cryptoBlessingAdreess} from 'src/@core/components/wallet/address'
 import {encode} from 'src/@core/utils/cypher'
 import * as nearAPI from 'near-api-js';
 
@@ -47,13 +47,13 @@ export const transClaimBlesingsFromWalletBlessings = (blessings) => {
     let newBlessings = []
     blessings.forEach(blessing => {
         newBlessings.push({
-            code: blessing.blessingID,
-            blessing: blessing.blessingImage,
-            sender: simpleShow(blessing.sender),
-            time: toLocaleDateFromBigInt(blessing.claimTimestamp.toString()),
-            amount: parseFloat(ethers.utils.formatEther(blessing.claimAmount)).toFixed(2),
-            tax: parseFloat(ethers.utils.formatEther(blessing.taxAmount)).toFixed(2),
-            progress: '/claim?sender=' + encode(blessing.sender) + '&blessing=' + encode(blessing.blessingID)
+            code: blessing.blessing_id,
+            blessing: blessing.blessing_image,
+            sender: blessing.sender,
+            time: toLocaleDateFromBigInt(blessing.claim_timestamp/1000000000),
+            amount: parseFloat(utils.format.formatNearAmount(blessing.claim_amount)).toFixed(2),
+            tax: parseFloat(utils.format.formatNearAmount(blessing.tax_amount)).toFixed(2),
+            progress: '/claim?sender=' + encode(blessing.sender) + '&blessing=' + encode(blessing.blessing_id)
         })
     })
 
@@ -66,19 +66,19 @@ export const transClaimListFromWalletClaims = (claims) => {
     let luckyClaimer = {}
     let maxClaimAmount = 0.0
     claims.forEach(claim => {
-        claimedAmount += parseFloat(ethers.utils.formatEther(claim.distributedAmount))
-        if (parseFloat(ethers.utils.formatEther(claim.distributedAmount)) > maxClaimAmount) {
-            maxClaimAmount = parseFloat(ethers.utils.formatEther(claim.distributedAmount))
+        claimedAmount += parseFloat(utils.format.formatNearAmount(claim.distributed_amount))
+        if (parseFloat(utils.format.formatNearAmount(claim.distributed_amount)) > maxClaimAmount) {
+            maxClaimAmount = parseFloat(utils.format.formatNearAmount(claim.distributed_amount))
             luckyClaimer = {
-                claimer: simpleShow(claim.claimer),
-                amount: ethers.utils.formatEther(claim.distributedAmount),
+                claimer: claim.claimer,
+                amount: utils.format.formatNearAmount(claim.distributed_amount),
             }
         }
         newClaims.push({
-            claimer: simpleShow(claim.claimer),
-            time: toLocaleDateFromBigInt(claim.claimTimestamp.toString()),
-            amount: ethers.utils.formatEther(claim.distributedAmount),
-            CBTokenAwardToSenderAmount: claim.CBTokenAwardToSenderAmount.toString(),
+            claimer: claim.claimer,
+            time: toLocaleDateFromBigInt(claim.claim_timestamp/1000000000),
+            amount: utils.format.formatNearAmount(claim.distributed_amount),
+            CBTokenAwardToSenderAmount: parseFloat(utils.format.formatNearAmount(claim.cbt_token_reward_to_sender_amount)).toFixed(2),
         })
     })
 

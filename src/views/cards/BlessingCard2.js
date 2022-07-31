@@ -209,10 +209,12 @@ const BlessingCard2 = (props) => {
   }
 
   async function submitSendBlessing() {
+    setSending(true)
     if (!checkFormValidate()) {
+      setSending(false)
+
       return
     }
-    setSending(true)
     const totalAmount = claimQuantity * props.blessing.near_price + parseFloat(tokenAmount)
     const totalAmountInYocto = utils.format.parseNearAmount(totalAmount + "")
     
@@ -251,11 +253,12 @@ const BlessingCard2 = (props) => {
         gas: DEFAULT_FUNCTION_CALL_GAS, // optional param, by the way
         attachedDeposit: totalAmountInYocto, 
         walletMeta: '', // optional param, by the way
-        walletCallbackUrl: document.location.toString() + '?callbackBlessingID=' + blessingID // optional param, by the way
+        walletCallbackUrl: document.location.toString().indexOf('?') != -1 ? 
+          document.location.toString() + '&callbackBlessingID=' + blessingID :
+          document.location.toString() + '?callbackBlessingID=' + blessingID
       });
       if (functionCallResult && functionCallResult.transaction && functionCallResult.transaction.hash) {
         console.log('Transaction hash for explorer', functionCallResult.transaction.hash)
-        setTransactionHash(functionCallResult.transaction.hash);
       }
     } catch (e) {
       console.log(e)

@@ -18,19 +18,17 @@ import ImageListItem from '@mui/material/ImageListItem';
 import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Box from '@mui/material/Box'
+import Avatar from '@mui/material/Avatar';
 import {BUSD_ICON, CBT_ICON} from 'src/@core/components/wallet/crypto-icons'
+import * as nearAPI from 'near-api-js';
+import {getWalletConnection, getNearConfig, getCurrentUser} from 'src/@core/configs/wallet'
 
-import {amountShow} from 'src/@core/utils/amount'
+import{ cbtBalance, nftBalance } from 'src/@core/configs/utils'
 
 
 import { useEffect, useState } from "react"
 
-import { ethers } from 'ethers';
-import { useWeb3React } from "@web3-react/core"
-import BUSDContract from 'src/artifacts/contracts/TestBUSD.sol/BUSD.json'
-import CBTContract from 'src/artifacts/contracts/CryptoBlessingToken.sol/CryptoBlessingToken.json'
-import CBNFTContract from 'src/artifacts/contracts/CryptoBlessingNFT.sol/CryptoBlessingNFT.json'
-import {BUSDContractAddress, CBTContractAddress, CBNFTContractAddress} from 'src/@core/components/wallet/address'
+const { utils } = nearAPI;
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
     [`&.${tableCellClasses.head}`]: {
@@ -56,37 +54,41 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
 
 const Wallet = () => {
 
-    const { active, account, chainId } = useWeb3React()
-
-    const [BNBAmount, setBNBAmount] = useState(0)
-    const [BUSDAmount, setBUSDAmount] = useState(0)
-    const [CBTAmount, setCBAmount] = useState('')
+    const [nearAmount, setNearAmount] = useState(0)
+    const [CBTAmount, setCBTAmount] = useState('')
     const [CBNFTItems, setCBNFTItems] = useState([])
 
+    const [nearConfig, setNearConfig] = useState(null)
+    const [currentUser, setCurrentUser] = useState('')
+
     async function fetchERC20Amount() {
-        if (active && chainId != 'undefined' && typeof window.ethereum !== 'undefined') {
-            const provider = new ethers.providers.Web3Provider(window.ethereum)
-            const busdContract = new ethers.Contract(BUSDContractAddress(chainId), BUSDContract.abi, provider.getSigner())
-            const cbtContract = new ethers.Contract(CBTContractAddress(chainId), CBTContract.abi, provider.getSigner())
-            const cbNFTContract = new ethers.Contract(CBNFTContractAddress(chainId), CBNFTContract.abi, provider.getSigner())
-            provider.getSigner().getAddress().then(async (address) => {
-                try {
-                    setBNBAmount(amountShow(await provider.getBalance(address)))
-                    setBUSDAmount(amountShow(await busdContract.balanceOf(address)))
-                    setCBAmount(await cbtContract.balanceOf(address) + '')
-                    setCBNFTItems(await cbNFTContract.getMyBlessingsURI())
-                } catch (err) {
-                    console.log("Error: ", err)
-                }
-            })
-            
-        }    
-      }
+        try {
+            setNearConfig(await getNearConfig())
+            setCurrentUser(await getCurrentUser())
+            if (currentUser) {
+                const walletConnection = await getWalletConnection()
+                    walletConnection.account().getAccountBalance().then(async (balance) => {
+                    setNearAmount(parseFloat(utils.format.formatNearAmount(balance.available)).toFixed(2))
+                })
+
+                const chainData = await cbtBalance(nearConfig, '{"account_id": "' + currentUser + '"}');
+                setCBTAmount(parseFloat(utils.format.formatNearAmount(chainData)).toFixed(2))
+                const nftData = await nftBalance(nearConfig, '{"account_id": "' + currentUser + '"}');
+                let images = []
+                nftData.map(item => {
+                    images.push(item.metadata.media)
+                })
+                setCBNFTItems(images)
+            }
+        } catch (err) {
+            console.log("Error: ", err)
+        }
+    }
     
-      useEffect(() => {
+    useEffect(() => {
         fetchERC20Amount()
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [chainId, account])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser])
 
     return (
         <Grid container spacing={6}>
@@ -95,7 +97,7 @@ const Wallet = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
                 <Card>
-                    <CardHeader title='ERC-20 Tokens' titleTypographyProps={{ variant: 'h6' }} />
+                    <CardHeader title='NEP-141 Tokens' titleTypographyProps={{ variant: 'h6' }} />
                     <TableContainer component={Paper}>
                         <Table sx={{ minWidth: 500 }} aria-label='customized table'>
                             <TableHead>
@@ -104,18 +106,13 @@ const Wallet = () => {
                                     <StyledTableCell align='right'>Balance</StyledTableCell>
                                 </TableRow>
                             </TableHead>
-                            <TableBody>
-                                <StyledTableRow key='BNB'>
+                            { currentUser ?
+                                <TableBody>
+                                <StyledTableRow key='NEAR'>
                                     <StyledTableCell component='th' scope='row'>
-                                        <Chip variant="outlined" icon={<BUSD_ICON />} label="BNB" />
+                                        <Chip variant="outlined" icon={<Avatar sx={{ width: 18, height: 18 }}>Ⓝ</Avatar>} label="NEAR" />
                                     </StyledTableCell>
-                                    <StyledTableCell align='right'>{BNBAmount}</StyledTableCell>
-                                </StyledTableRow>
-                                <StyledTableRow key='BUSD'>
-                                    <StyledTableCell component='th' scope='row'>
-                                        <Chip variant="outlined" icon={<BUSD_ICON />} label="BUSD" />
-                                    </StyledTableCell>
-                                    <StyledTableCell align='right'>{BUSDAmount}</StyledTableCell>
+                                    <StyledTableCell align='right'>{nearAmount}</StyledTableCell>
                                 </StyledTableRow>
                                 <StyledTableRow key='CBT'>
                                     <StyledTableCell component='th' scope='row'>
@@ -124,28 +121,34 @@ const Wallet = () => {
                                     <StyledTableCell align='right'>{CBTAmount}</StyledTableCell>
                                 </StyledTableRow>
                             </TableBody>
+                            :
+                            <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                                <Typography  variant="overline" display="block" gutterBottom>
+                                    Pls login to see your assets
+                                </Typography>
+                            </Box>
+                            }
                         </Table>
                     </TableContainer>
                 </Card>
                 <Card>
                     <CardContent>
-                        <Typography variant='caption'>You can buy BNB on <Link target='_blank' href='https://www.binance.com/en/buy-BNB'>Binance</Link></Typography>
-                        <Typography variant='caption'>, or exchange BUSD on <Link target='_blank' href='https://pancakeswap.finance/swap?outputCurrency=0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56'>PancakeSwap</Link></Typography>
+                        <Typography variant='caption'>See my NEP-141 Tokens on <Link target='_blank' href='https://wallet.near.org/'>NEAR Wallet Page</Link></Typography>
                     </CardContent>
                 </Card>
                 
             </Grid>
             <Grid item xs={12} sm={6}>
                 <Card>
-                    <CardHeader title='ERC-721 Tokens' titleTypographyProps={{ variant: 'h6' }} />
+                    <CardHeader title='NEP-178 Tokens' titleTypographyProps={{ variant: 'h6' }} />
                     <CardContent>
                         { CBNFTItems.length > 0 ?
                         <ImageList sx={{ width: 500, height: 450 }} cols={3} rowHeight={164}>
                         {CBNFTItems.map((item, index) => (
                             <ImageListItem key={item + '-' + index}>
                             <img
-                                src={`${process.env.vultr_cdn_path + item}?w=164&h=164&fit=crop&auto=format`}
-                                srcSet={`${process.env.vultr_cdn_path + item}?w=164&h=164&fit=crop&auto=format&dpr=2 2x`}
+                                src={`${item}?w=164&h=164&fit=crop&auto=format`}
+                                srcSet={`${item}?w=164&h=164&fit=crop&auto=format&dpr=2 2x`}
                                 alt={item}
                                 loading="lazy"
                             />
@@ -155,13 +158,19 @@ const Wallet = () => {
                         :
                         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                             <Typography  variant="overline" display="block" gutterBottom>
-                                You don't have claimed any CryptoBlessing NFT yet!
+                                {currentUser ? "You don't have claimed any CryptoBlessing NFT yet!" : 'Pls login to see your assets'}
                             </Typography>
                         </Box>
                         }
 
                     </CardContent>
                     
+                </Card>
+
+                <Card>
+                    <CardContent>
+                        <Typography variant='caption'>See my NEP-178 Tokens on <Link target='_blank' href='https://wallet.testnet.near.org/?tab=collectibles'>NEAR Collectibles Page</Link></Typography>
+                    </CardContent>
                 </Card>
             </Grid>
         </Grid>

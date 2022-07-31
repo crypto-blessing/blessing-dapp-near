@@ -220,10 +220,12 @@ const BlessingSendPage = () => {
       }
     
       async function submitSendBlessing() {
-        if (!checkFormValidate()) {
-          return
-        }
         setSending(true)
+        if (!checkFormValidate()) {
+            setSending(false)
+            
+            return
+        }
         const totalAmount = claimQuantity * blessingInDB.near_price + parseFloat(tokenAmount)
         const totalAmountInYocto = utils.format.parseNearAmount(totalAmount + "")
         
@@ -266,7 +268,6 @@ const BlessingSendPage = () => {
           });
           if (functionCallResult && functionCallResult.transaction && functionCallResult.transaction.hash) {
             console.log('Transaction hash for explorer', functionCallResult.transaction.hash)
-            setTransactionHash(functionCallResult.transaction.hash);
           }
         } catch (e) {
           console.log(e)

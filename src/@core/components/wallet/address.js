@@ -18,6 +18,10 @@ export const simpleShow = (address) => {
     
 }
 
+export const simpleShowNear = (account) => {
+    return account.replace("crypto_blessing_", "...");
+}
+
 export const chainName = (chainId) => {
     switch (chainId) {
         case 56:
