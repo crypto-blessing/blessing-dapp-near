@@ -204,8 +204,8 @@ const ClaimPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   async function featchAllInfoOfBlessing() {
     try {
+      console.log('start to fetching info of blessing on chain')
       const chainData = await viewMethodOnContract(nearConfig, 'get_all_info_of_blessing', '{"sender": "' + sender + '","blessing_id": "' + blessingID + '"}');
-      console.log(chainData)
       setBlessing(chainData.blessing)
       setBlessingSended(chainData.sender_blessing)
       console.log(chainData.blessing_claim_status)
@@ -351,8 +351,9 @@ const ClaimPage = () => {
         setClaimBlessingWithoutLoginOpen(false)
         tempClaimerKeyPair.account = 'crypto_blessing_' + newAccountID + nearConfig.accountSuffix
         localStorage.setItem('temp_claimer_keypair_' + blessingID, JSON.stringify(tempClaimerKeyPair))
-        setLastGenKeyPair(JSON.parse(tempClaimerKeyPair))
+        setLastGenKeyPair(tempClaimerKeyPair)
         featchAllInfoOfBlessing()
+        
       }
       
     } catch (e) {
