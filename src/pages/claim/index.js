@@ -499,7 +499,7 @@ const ClaimPage = () => {
             }
             
             {
-              claimList.length > 0 && claimList.length == blessingSended.claimQuantity ?
+              claimList.length > 0 && claimList.length == blessingSended.claim_quantity ?
               <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                 <Typography  variant="overline" display="block" gutterBottom>
                   All the blessings have already been claimed!
