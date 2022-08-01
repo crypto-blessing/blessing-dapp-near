@@ -53,9 +53,10 @@ const AppBarContent = props => {
     window.open("https://cryptoblessing.app/","_blank");
   }
 
-
+  const [alertOpen, setAlertOpen] = useState(false);
   const [alertTitle, setAlertTitle] = useState('')
   const [alertMessage, setAlertMessage] = useState('')
+
   const [currentUser, setCurrentUser] = useState('')
   const [nearConfig, setNearConfig] = useState({})
 
@@ -100,6 +101,18 @@ const AppBarContent = props => {
   const handleClose = () => {
     setOpen(false);
   }
+
+  useEffect(() => {
+    const loadBeforeOp = async () => {
+      const blockResp = await fetch(`/api/security/block`)
+      if (blockResp.block) {
+        setAlertTitle("Block Detected")
+        setAlertMessage("Service is not available in your area, please leave.💗💗💗")
+        setAlertOpen(true)
+      }
+    }
+    loadBeforeOp()
+  }, [])
 
   return (
 
@@ -184,7 +197,7 @@ const AppBarContent = props => {
       {/** System maintenance in progress */}
 
       <Dialog
-        open={open}
+        open={alertOpen}
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
