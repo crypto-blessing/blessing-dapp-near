@@ -14,8 +14,9 @@ export const getWalletConnection = async () => {
     return new nearAPI.WalletConnection(near);
 }
 
+
 export const getNearConfig = async () => {
-    return getConfig('testnet');
+    return getConfig('mainnet');
 }
 
 export const getCurrentUser = async () => {

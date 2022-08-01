@@ -169,7 +169,7 @@ const Wallet = () => {
 
                 <Card>
                     <CardContent>
-                        <Typography variant='caption'>See my NEP-178 Tokens on <Link target='_blank' href='https://wallet.testnet.near.org/?tab=collectibles'>NEAR Collectibles Page</Link></Typography>
+                        <Typography variant='caption'>See my NEP-178 Tokens on <Link target='_blank' href={nearConfig?.walletUrl}>NEAR Collectibles Page</Link></Typography>
                     </CardContent>
                 </Card>
             </Grid>
