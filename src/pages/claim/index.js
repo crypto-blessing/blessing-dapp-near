@@ -365,16 +365,17 @@ const ClaimPage = () => {
     }
   }
 
-  const toWalletHandle = () => {
-    window.location.replace("/wallet")
-  }
+  useEffect(() => {
+    const connectWalletOnPageLoad = async () => {
+      setCurrentUser(await getCurrentUser())
+      setNearConfig(await getNearConfig())
+    }
+    connectWalletOnPageLoad()
+  }, [])
 
   useEffect(() => {
     const connectWalletOnPageLoad = async () => {
       try {
-          setNearConfig(await getNearConfig())
-          setCurrentUser(await getCurrentUser())
-          console.log('current user: ', currentUser)
           if (!currentUser && blessingID) {
             let existingKey = localStorage.getItem('temp_claimer_' + blessingID);
 
@@ -389,7 +390,7 @@ const ClaimPage = () => {
             setClaimerSeedPhrase(JSON.parse(lastGenKeyPair).seedPhrase)
             setLastGenKeyPair(JSON.parse(lastGenKeyPair))
           }
-          if (sender) {
+          if (sender && nearConfig && nearConfig.nodeUrl) {
             await featchAllInfoOfBlessing()
           }
       } catch (err) {
@@ -398,7 +399,7 @@ const ClaimPage = () => {
     }
     connectWalletOnPageLoad()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sender])
+  }, [sender, currentUser])
 
   return (
     <Grid container spacing={6}>
