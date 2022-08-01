@@ -521,7 +521,7 @@ const ClaimPage = () => {
             }}
             >
             { !currentUser ?
-            <Button disabled={alreadyClaimed} onClick={handleClaimBlessingWithoutLoginOpen} variant='contained' sx={{ py: 2.5, width: '100%', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+            <Button disabled={claimList.length == blessingSended.claim_quantity || alreadyClaimed} onClick={handleClaimBlessingWithoutLoginOpen} variant='contained' sx={{ py: 2.5, width: '100%', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
               Claim Blessing Without Login
             </Button>
             :
@@ -587,7 +587,7 @@ const ClaimPage = () => {
             { currentUser && sender !== currentUser ?
             <Stack direction="row" spacing={1}>
               <Box sx={{ m: 1, position: 'relative' }}>
-                <Button disabled={claiming || claimKey == '' || alreadyClaimed} onClick={claimBlessing} size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
+                <Button disabled={claiming || claimKey == '' || alreadyClaimed || claimList.length == blessingSended.claim_quantity} onClick={claimBlessing} size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
                   {claiming ? 'Waiting for claim transaction...' : 'Claim Blessing'}
                 </Button>
                 {claiming && (

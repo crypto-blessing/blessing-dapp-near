@@ -23,7 +23,7 @@ const navigation = () => {
       sectionTitle: 'Mine'
     },
     {
-      title: 'Sended',
+      title: 'Sent',
       icon: SendAndArchiveIcon,
       path: '/sended',
     },
