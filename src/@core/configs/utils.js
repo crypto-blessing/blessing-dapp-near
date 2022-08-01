@@ -11,10 +11,12 @@ async function viewMethodOnContract(nearConfig, method, params) {
   console.log('params: ', params);
   const paramBytes = Buffer.from(params, 'utf8');
   const base58Params = bs58.encode(paramBytes);
-
+  console.log('base58Params: ', base58Params);
   const provider = new nearAPI.providers.JsonRpcProvider(nearConfig.nodeUrl);
+  console.log('provider: ', provider);
   const rawResult = await provider.query(`call/${nearConfig.contractName}/${method}`, base58Params);
-
+  console.log('rawResult: ', rawResult);
+  
   return JSON.parse(rawResult.result.map((x) => String.fromCharCode(x)).join(''));
 }
 
