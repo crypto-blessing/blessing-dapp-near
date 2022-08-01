@@ -290,7 +290,7 @@ const ClaimPage = () => {
         setClaiming(false)
         localStorage.setItem('my_claimed_' + blessingID, 1)
         setAlreadyClaimed(true)
-        await featchAllInfoOfBlessing()
+        setTimeout("featchAllInfoOfBlessing()", 3000 )
       }
       
     } catch (e) {
@@ -352,7 +352,7 @@ const ClaimPage = () => {
         tempClaimerKeyPair.account = newAccountID
         localStorage.setItem('temp_claimer_keypair_' + blessingID, JSON.stringify(tempClaimerKeyPair))
         setLastGenKeyPair(JSON.parse(tempClaimerKeyPair))
-        await featchAllInfoOfBlessing()
+        setTimeout("featchAllInfoOfBlessing()", 3000 )
       }
       
     } catch (e) {
