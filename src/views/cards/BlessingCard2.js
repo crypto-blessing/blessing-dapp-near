@@ -378,13 +378,13 @@ const BlessingCard2 = (props) => {
                     <TextField
                       onChange={handleTokenAmountChange}
                       fullWidth
-                      label={'How much NEAR do you want to send?(wallet: ' + nearAmount + ' ⓃNEAR)'}
+                      label={'How much ⓃNEAR do you want to send?(wallet: ' + nearAmount + ' ⓃNEAR)'}
                       placeholder='10'
                       type='number'
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position='start'>
-                            <Icon>Ⓝ</Icon>
+                            <Avatar sx={{ width: 20, height: 20 }}>Ⓝ</Avatar>
                           </InputAdornment>
                         )
                       }}

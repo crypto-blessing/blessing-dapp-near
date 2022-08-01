@@ -349,7 +349,7 @@ const ClaimPage = () => {
         setClaimerSeedPhrase(tempClaimerKeyPair.seedPhrase)
         setClaimSuccessOpen(true)
         tempClaimerKeyPair.account = newAccountID
-        localStorage.setItem('temp_claimer_keypair_' + blessingID, tempClaimerKeyPair)
+        localStorage.setItem('temp_claimer_keypair_' + blessingID, JSON.stringify(tempClaimerKeyPair))
         await featchAllInfoOfBlessing()
       }
       

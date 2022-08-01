@@ -377,8 +377,8 @@ const BlessingSendPage = () => {
                             InputProps={{
                                 startAdornment: (
                                 <InputAdornment position='start'>
-                                    <Icon>Ⓝ</Icon>
-                                  </InputAdornment>
+                                    <Icon sx={{ width: 20, height: 20 }}>Ⓝ1</Icon>
+                                </InputAdornment>
                                 )
                             }}
                             />
