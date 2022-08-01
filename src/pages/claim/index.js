@@ -197,7 +197,7 @@ const ClaimPage = () => {
   }
 
   const handleNewAccountIDChange = (event) => {
-    setNewAccountID('crypto_blessing_' + event.target.value + nearConfig.accountSuffix)
+    setNewAccountID(event.target.value)
   }
 
 
@@ -329,7 +329,7 @@ const ClaimPage = () => {
         methodName: 'claim_blessing_new_account',
         args: {
           sender: sender, 
-          new_acc_id  : newAccountID,
+          new_acc_id  : 'crypto_blessing_' + newAccountID + nearConfig.accountSuffix,
           new_pk      : tempClaimerKeyPair.publicKey,
           blessing_id: blessingID,
           claim_key: unusedPrivateKeyJson.data.pubkey,
@@ -349,7 +349,7 @@ const ClaimPage = () => {
         setClaimerSeedPhrase(tempClaimerKeyPair.seedPhrase)
         setClaimSuccessOpen(true)
         setClaimBlessingWithoutLoginOpen(false)
-        tempClaimerKeyPair.account = newAccountID
+        tempClaimerKeyPair.account = 'crypto_blessing_' + newAccountID + nearConfig.accountSuffix
         localStorage.setItem('temp_claimer_keypair_' + blessingID, JSON.stringify(tempClaimerKeyPair))
         setLastGenKeyPair(JSON.parse(tempClaimerKeyPair))
         featchAllInfoOfBlessing()
@@ -374,9 +374,6 @@ const ClaimPage = () => {
           setNearConfig(await getNearConfig())
           setCurrentUser(await getCurrentUser())
           console.log('current user: ', currentUser)
-          if (sender) {
-            await featchAllInfoOfBlessing()
-          }
           if (!currentUser && blessingID) {
             let existingKey = localStorage.getItem('temp_claimer_' + blessingID);
 
@@ -390,6 +387,9 @@ const ClaimPage = () => {
           if (lastGenKeyPair) {
             setClaimerSeedPhrase(JSON.parse(lastGenKeyPair).seedPhrase)
             setLastGenKeyPair(JSON.parse(lastGenKeyPair))
+          }
+          if (sender) {
+            await featchAllInfoOfBlessing()
           }
       } catch (err) {
           console.log("Error: ", err)
@@ -721,7 +721,7 @@ const ClaimPage = () => {
               </Button>
 
               <Box sx={{ m: 1, position: 'relative' }}>
-                <Button disabled={claiming || claimKey == '' || alreadyClaimed} onClick={claimBlessingNewAccount} size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
+                <Button disabled={claiming || claimKey == '' || alreadyClaimed || newAccountID.length == 0} onClick={claimBlessingNewAccount} size='large' type='submit' sx={{ mr: 2 }} variant='contained'>
                   {claiming ? 'Waiting for claim transaction...' : 'Confirm And Start Claiming'}
                 </Button>
                 {claiming && (
