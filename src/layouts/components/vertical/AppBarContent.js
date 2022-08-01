@@ -104,12 +104,15 @@ const AppBarContent = props => {
 
   useEffect(() => {
     const loadBeforeOp = async () => {
-      const blockResp = await fetch(`/api/security/block`)
-      if (blockResp.block) {
-        setAlertTitle("Block Detected")
-        setAlertMessage("Service is not available in your area, please leave.💗💗💗")
-        setAlertOpen(true)
-      }
+      fetch('/api/security/block')
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.block) {
+              setAlertTitle("Security Detected")
+              setAlertMessage("Service is not available in your area, please leave.💗💗💗")
+              setAlertOpen(true)
+            }
+          })
     }
     loadBeforeOp()
   }, [])
