@@ -70,7 +70,7 @@ const BlessingSended = () => {
             }
         }
         connectWalletOnPageLoad()
-    }, [currentUser, nearConfig])
+    }, [currentUser])
 
     return (
         <Grid container spacing={6}>
