@@ -87,7 +87,7 @@ const BlessingSendPage = () => {
             setBlessingID(callbackBlessingID)
         }
         if (blessing) {
-            fetch(`/api/items/fetchOneItem?image=${decode(blessing)}`)
+            fetch(`/api/items/fetchOneItem?image=${encodeURIComponent(decode(blessing))}`)
                 .then((res) => res.json())
                 .then((data) => {
                 setBlessingInDB(data)
@@ -369,19 +369,19 @@ const BlessingSendPage = () => {
                         <Grid container spacing={5}>
                         <Grid item xs={12}>
                             <TextField
-                            onChange={handleTokenAmountChange}
-                            fullWidth
-                            label={'How much ⓃNear do you want to send?(wallet: ' + nearAmount + ' ⓃNEAR)'}
-                            placeholder='10'
-                            type='number'
-                            InputProps={{
-                                startAdornment: (
-                                <InputAdornment position='start'>
-                                    <Icon sx={{ width: 20, height: 20 }}>Ⓝ1</Icon>
-                                </InputAdornment>
-                                )
-                            }}
-                            />
+                                onChange={handleTokenAmountChange}
+                                fullWidth
+                                label={'How much ⓃNEAR do you want to send?(wallet: ' + nearAmount + ' ⓃNEAR)'}
+                                placeholder='10'
+                                type='number'
+                                InputProps={{
+                                    startAdornment: (
+                                    <InputAdornment position='start'>
+                                        <Avatar sx={{ width: 20, height: 20 }}>Ⓝ</Avatar>
+                                    </InputAdornment>
+                                    )
+                                }}
+                                />
                         </Grid>
                         
                         <Grid item xs={12}>
