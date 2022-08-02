@@ -19,7 +19,7 @@ function getConfig(env) {
         networkId: 'testnet',
         accountSuffix: '.testnet',
         nodeUrl: 'https://rpc.testnet.near.org',
-        contractName: 'v1.cryptoblessing.testnet',
+        contractName: 'v2.cryptoblessing.testnet',
         cbtContractName: 'token.cryptoblessing.testnet',
         nftContractName: 'nft.cryptoblessing.testnet',
         walletUrl: 'https://wallet.testnet.near.org',

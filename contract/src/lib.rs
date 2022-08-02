@@ -12,7 +12,7 @@ use near_sdk::{
 use near_sdk::{json_types::U128, env, near_bindgen, PublicKey};
 use near_sdk::json_types::Base64VecU8;
 use near_sdk::{serde_json};
-use constants::{ONE_YOCTO, GAS_FOR_FT_TRANSFER, GAS_FOR_NFT_TRANSFER, DEPOSIT_FOR_NFT_MINT, GAS_FOR_ACCOUNT_CREATION, GAS_FOR_ACCOUNT_CALLBACK};
+use constants::{ONE_YOCTO, GAS_FOR_FT_TRANSFER, GAS_FOR_NFT_TRANSFER, DEPOSIT_FOR_NFT_MINT, GAS_FOR_ACCOUNT_CREATION, GAS_FOR_ACCOUNT_CALLBACK, DEPOSIT_FOR_STRORAGE};
 use near_contract_standards::non_fungible_token::{TokenId};
 use near_contract_standards::non_fungible_token::metadata::{
     TokenMetadata,
@@ -20,13 +20,29 @@ use near_contract_standards::non_fungible_token::metadata::{
 
 #[ext_contract(ext_ft)]
 pub trait ExtFt {
+
     #[payable]
     fn ft_transfer(
         &mut self, 
         receiver_id: AccountId, 
         amount: U128, 
         memo: Option<String>);
+
+    #[payable]
+    fn storage_deposit(
+        &mut self,
+        account_id: Option<AccountId>,
+        registration_only: Option<bool>,
+    ) -> StorageBalance;
 }
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct StorageBalance {
+    pub total: U128,
+    pub available: U128,
+}
+
 
 #[ext_contract(ext_nft)]
 pub trait ExtNft {
@@ -176,6 +192,8 @@ impl CryptoBlessing {
         title: String,
         description: String,
     ) {
+        // Delete full access call
+        // Promise::new(env::current_account_id()).delete_key(new_pk.clone());
         let mut claimer_blessings = self.claimer_blessings.get(&claimer).unwrap_or_default();
         claimer_blessings.push(ClaimerBlessing {
             sender: sender.clone(),
@@ -207,14 +225,18 @@ impl CryptoBlessing {
         // ext_ft::ft_transfer(sender, near_sdk::json_types::U128(cbt_token_reward), None, self.cbt_token_id.clone(), ONE_YOCTO, GAS_FOR_FT_TRANSFER);
         // ext_nft::nft_mint(claimer, token_id, token_uri, account_id, balance, gas);
         ext_ft::ext(self.cbt_token_id.clone())
-            .with_attached_deposit(ONE_YOCTO)
-            .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .ft_transfer(sender, near_sdk::json_types::U128(cbt_token_reward), None);
+            .with_attached_deposit(DEPOSIT_FOR_STRORAGE)
+            .storage_deposit(Some(sender.clone()), Some(true)).then(
+                ext_ft::ext(self.cbt_token_id.clone())
+                .with_attached_deposit(ONE_YOCTO)
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(sender.clone(), near_sdk::json_types::U128(cbt_token_reward), None)
+            );
 
         ext_nft::ext(self.nft_token_id.clone())
             .with_attached_deposit(DEPOSIT_FOR_NFT_MINT)
             .with_static_gas(GAS_FOR_NFT_TRANSFER)
-            .nft_mint(claim_key, claimer.clone(), TokenMetadata { 
+            .nft_mint(claim_key.clone(), claimer.clone(), TokenMetadata { 
                 title: Some(title), 
                 description: Some(description),
                 media: Some(blessing.ipfs), 
@@ -222,9 +244,6 @@ impl CryptoBlessing {
                 media_hash: None, issued_at: None, expires_at: None, starts_at: None, updated_at: None, extra: None, reference:None, reference_hash:None
             });
             
-        // Delete full access call
-        Promise::new(env::current_account_id()).delete_key(new_pk.clone());
-
     }
 }
 
@@ -293,6 +312,8 @@ impl CryptoBlessing {
             cbt_reward_max: 100_000_000_000_000_000_000_000_000,
             cbt_token_id: AccountId::new_unchecked("token.cryptoblessing.near".to_string()),
             nft_token_id: AccountId::new_unchecked("nft.cryptoblessing.near".to_string()),
+            // cbt_token_id: AccountId::new_unchecked("token.cryptoblessing.testnet".to_string()),
+            // nft_token_id: AccountId::new_unchecked("nft_v2.cryptoblessing.testnet".to_string()),
             claim_tax_rate: 10,
             blessing_map: LookupMap::new(b"b"),
             sender_blessings: LookupMap::new(b"s"),
@@ -639,7 +660,7 @@ impl CryptoBlessing {
         assert!(distribution_amount > DEPOSIT_FOR_NFT_MINT, "Distribution amount is too low");
 
         ext_linkdrop::ext(AccountId::from(self.creator_account.clone()))
-            .with_attached_deposit((distribution_amount - DEPOSIT_FOR_NFT_MINT) / 1000 * (1000 - self.claim_tax_rate as u128))
+            .with_attached_deposit((distribution_amount - DEPOSIT_FOR_NFT_MINT - DEPOSIT_FOR_STRORAGE) / 1000 * (1000 - self.claim_tax_rate as u128))
             .with_static_gas(GAS_FOR_ACCOUNT_CREATION) // This amount of gas will be split
             .create_account(new_acc_id.parse().unwrap(), new_pk.clone())
             .then(
