@@ -145,7 +145,11 @@ const ClaimPage = () => {
   
 
   const [blessing, setBlessing] = useState({})
-  const [blessingInDB, setBlessingInDB] = useState({})
+
+  const [blessingInDB, setBlessingInDB] = useState({
+    cdn_path: 'https://ewr1.vultrobjects.com/crypto-blessing/',
+    image: 'logo_200_200.gif'
+  })
   const [blessingSended, setBlessingSended] = useState({})
   const [claimList, setClaimList] = useState([])
   const [claimedAmount, setClaimedAmount] = useState(0)
@@ -399,7 +403,7 @@ const ClaimPage = () => {
     }
     connectWalletOnPageLoad()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sender, currentUser])
+  }, [sender, currentUser, nearConfig])
 
   return (
     <Grid container spacing={6}>
