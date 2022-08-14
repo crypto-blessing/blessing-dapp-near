@@ -53,6 +53,11 @@ const AppBarContent = props => {
     window.open("https://cryptoblessing.app/","_blank");
   }
 
+  const handleSolanaClose = () => {
+    setAnchorEl(null);
+    window.open("https://solana.cryptoblessing.app/","_blank");
+  }
+
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertTitle, setAlertTitle] = useState('')
   const [alertMessage, setAlertMessage] = useState('')
@@ -164,6 +169,7 @@ const AppBarContent = props => {
             }}
           >
             <MenuItem onClick={handleBSCClose}>Binance Smart Chain</MenuItem>
+            <MenuItem onClick={handleSolanaClose}>Solana Chain</MenuItem>
           </Menu2>
         </div>
       </Box>
