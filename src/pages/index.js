@@ -71,7 +71,7 @@ const Market = () => {
 
     const copyClaimLink = () => {
         const privateKey = localStorage.getItem('my_blessing_claim_key_' + callbackBlessingID)
-        navigator.clipboard.writeText(`[CryptoBlessing] ${blessingInDB.title} | ${blessingInDB.description}. Claim your ⓃNear & blessing NFT here: https://near.cryptoblessing.app/claim?sender=${encode(currentUser)}&blessing=${encode(callbackBlessingID)}&key=${encode(privateKey)}`)
+        navigator.clipboard.writeText(`[CryptoBlessing] ${blessingInDB.title} | ${blessingInDB.description}. Claim your ⓃNear & blessing NFT here: https://near-test.cryptoblessing.app/claim?sender=${encode(currentUser)}&blessing=${encode(callbackBlessingID)}&key=${encode(privateKey)}`)
         setAlertMsg('Claim Link Copied.')
         setAlertOpen(true);
     }
